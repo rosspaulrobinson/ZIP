@@ -1,0 +1,546 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_104087_COPY_BPC_INFOOBJECTS</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_104087_COPY_BPC_INFOOBJECTS</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Copy BPC Dimensions to Characteristics ('/CPMB/' to 'Z' namespace)</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_104087_COPY_BPC_INFOOBJECTS</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_104087_copy_bpc_infoobjects.
+
+data:
+  gv_iobjnm type rsiobjnm.
+
+selection-screen begin of block b1 with frame title text-obj.
+
+select-options s_iobjnm for gv_iobjnm obligatory default '/CPMB/XXXXXXX'.
+
+selection-screen end of block b1.
+
+selection-screen begin of block b2 with frame title text-ctg.
+
+parameters p_catg_d type rsinfoobjcat obligatory default 'ZIA_SU_PRD_BPCO_DIM'.
+parameters p_catg_p type rsinfoobjcat obligatory default 'ZIA_SU_PRD_BPCO_PRO'.
+parameters p_updctg type rs_bool                 default rs_c_true.
+
+selection-screen end of block b2.
+
+selection-screen begin of block b3 with frame title text-are.
+
+parameters p_area type rsinfoarea obligatory default 'ZIA_SU_PRD_BPCO'.
+
+selection-screen end of block b3.
+
+selection-screen begin of block b4 with frame title text-opt.
+
+parameters p_pro    type rs_bool default rs_c_false.
+parameters p_dim    type rs_bool default rs_c_false.
+parameters p_cts    type rs_bool default rs_c_false.
+
+selection-screen end of block b4.
+
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl DEFINITION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl definition.
+
+  public section.
+
+    types:
+      begin of ty_wa_iobj_detail,
+        v_iobjnm                   type rsiobjnm,
+        wa_details                 type bapi6108,
+        wa_return                  type bapiret2,
+        f_iobjnm_in_infoset        type rs_bool,
+        f_atr                      type rs_bool,
+        t_compounds                type table of bapi6108cm with non-unique key table_line,
+        t_attributes               type table of bapi6108at with non-unique key table_line,
+        t_navigationattributes     type table of bapi6108an with non-unique key table_line,
+        t_atrnavinfoprovider       type table of bapi6108np with non-unique key table_line,
+        t_hierarchycharacteristics type table of bapi6108hc with non-unique key table_line,
+        t_elimination              type table of bapi6108ie with non-unique key table_line,
+        t_hanafieldsmapping        type table of bapi6108hana_map with non-unique key table_line,
+        f_processed                type rs_bool,
+      end   of ty_wa_iobj_detail,
+      ty_t_iobj_detail             type table of ty_wa_iobj_detail with non-unique key v_iobjnm.
+
+    types:
+      begin of ty_wa_iobj_create,
+        v_iobjnm                   type rsiobjnm,
+        wa_details                 type bapi6108,
+        v_infoobjcat               type bapi6113-infoobjcat,
+        t_attributes               type table of bapi6108at with non-unique key table_line,
+        t_navigationattributes     type table of bapi6108an with non-unique key table_line,
+        f_exists                   type rs_bool,
+        f_processed                type rs_bool,
+      end   of ty_wa_iobj_create,
+      ty_t_iobj_create             type table of ty_wa_iobj_create with non-unique key v_iobjnm.
+
+    data:
+      t_iobjnm                    type table of rsiobjnm,
+      t_iobj_detail               type ty_t_iobj_detail,
+      t_iobj_create               type ty_t_iobj_create.
+
+    methods:
+      execute.
+
+  private section.
+
+    methods:
+      get_iobj_detail.
+
+    methods:
+      copy_detail_to_create.
+
+    methods:
+      copy_iobj_without_attributes.
+
+    methods:
+      copy_iobj_with_attributes.
+
+    methods
+      add_to_transport.
+
+    methods
+      activate_iobj
+        importing iv_iobjnm type rsiobjnm.
+
+    class-methods
+      _check_iobj_exists
+        importing
+          iv_iobjnm type rsiobjnm
+        returning
+          value(rf_iobj_exists) type rs_bool.
+
+    class-methods:
+      _change_tech_names
+        importing
+          iwa_iobj_detail type ty_wa_iobj_detail
+        returning
+          value(rwa_iobj_create) type ty_wa_iobj_create.
+
+endclass.                    "lcl DEFINITION
+
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl IMPLEMENTATION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl implementation.
+
+  method execute.
+
+    select iobjnm
+      into table t_iobjnm
+      from rsdiobj
+      where iobjnm in s_iobjnm and
+            objvers = rs_c_objvers-active.
+
+    get_iobj_detail( ).
+
+    copy_detail_to_create( ).
+
+    copy_iobj_without_attributes( ).
+
+    copy_iobj_with_attributes( ).
+
+    add_to_transport( ).
+
+  endmethod.                    "execute
+
+  method get_iobj_detail.
+
+    data:
+      lv_iobjnm                    type rsiobjnm,
+      lwa_iobj_detail              type ty_wa_iobj_detail.
+
+    loop at t_iobjnm into lv_iobjnm.
+
+      clear lwa_iobj_detail.
+
+      lwa_iobj_detail-v_iobjnm = lv_iobjnm.
+
+      call function 'BAPI_IOBJ_GETDETAIL'
+        exporting
+          infoobject               = lwa_iobj_detail-v_iobjnm
+        importing
+          details                  = lwa_iobj_detail-wa_details
+          return                   = lwa_iobj_detail-wa_return
+          is_iobjnm_in_infoset     = lwa_iobj_detail-f_iobjnm_in_infoset
+          is_atr                   = lwa_iobj_detail-f_atr
+        tables
+          compounds                = lwa_iobj_detail-t_compounds
+          attributes               = lwa_iobj_detail-t_attributes
+          navigationattributes     = lwa_iobj_detail-t_navigationattributes
+          atrnavinfoprovider       = lwa_iobj_detail-t_atrnavinfoprovider
+          hierarchycharacteristics = lwa_iobj_detail-t_hierarchycharacteristics
+          elimination              = lwa_iobj_detail-t_elimination
+          hanafieldsmapping        = lwa_iobj_detail-t_hanafieldsmapping.
+
+      append lwa_iobj_detail to t_iobj_detail.
+
+    endloop.
+
+  endmethod.                    "get_iobj_detail
+
+  method copy_detail_to_create.
+
+    data:
+      lwa_iobj_detail              type ty_wa_iobj_detail,
+      lwa_iobj_create              type ty_wa_iobj_create.
+
+    loop at t_iobj_detail into lwa_iobj_detail.
+
+      "Change the technical names, e.g. replace /CPMB/ namespace with Z.
+      lwa_iobj_create = lcl=&gt;_change_tech_names( lwa_iobj_detail ).
+      append lwa_iobj_create to t_iobj_create.
+
+    endloop.
+
+    sort t_iobj_create by f_exists descending.
+
+  endmethod.                    "copy_detail_to_create
+
+  method copy_iobj_without_attributes.
+
+    data:
+      lv_iobjnm                    type rsiobjnm,
+      lwa_iobciobj                 type rsdiobciobj,
+      lwa_return                   type bapiret2,
+      lv_mtext                     type string.
+
+    field-symbols:
+      &lt;lwa_iobj_create&gt;            type ty_wa_iobj_create.
+
+    check p_pro = rs_c_true.
+
+    loop at t_iobj_create assigning &lt;lwa_iobj_create&gt;
+      where
+        f_processed = rs_c_false and
+        t_attributes is initial.
+
+      "Set the processed flag for the InfoObject.
+      &lt;lwa_iobj_create&gt;-f_processed = rs_c_true.
+
+      "Set InfoObject name.
+      lv_iobjnm = &lt;lwa_iobj_create&gt;-v_iobjnm.
+
+      "If flagged in the selection screen update the InfoObject catalogue.
+      if p_updctg = rs_c_true and &lt;lwa_iobj_create&gt;-f_exists = rs_c_true.
+
+        "Delete all InfoObject catalogue references.
+        delete from rsdiobciobj where iobjnm = lv_iobjnm and objvers = 'A'.
+
+        lwa_iobciobj-infoobjcat = p_catg_p.
+        lwa_iobciobj-objvers    = 'A'.
+        lwa_iobciobj-iobjnm     = lv_iobjnm.
+
+        "Create InfoObject catalogue reference.
+        modify rsdiobciobj from lwa_iobciobj.
+
+      endif.
+
+      "Only create the Infobject if it doesn't already exist.
+      if &lt;lwa_iobj_create&gt;-f_exists = rs_c_false.
+
+        "Create the InfoObject as a copy of the BPC Dimension.
+        call function 'BAPI_IOBJ_CREATE'
+          exporting
+            details    = &lt;lwa_iobj_create&gt;-wa_details
+            infoobjcat = p_catg_p
+          importing
+            infoobject = lv_iobjnm
+            return     = lwa_return.
+
+        lv_mtext = lwa_return-message.
+        write: / lv_mtext.
+
+        if lwa_return-type = 'S'.
+          activate_iobj( lv_iobjnm ).
+        endif.
+
+      endif.
+
+    endloop.
+
+  endmethod.                    "copy_iobj_without_attributes
+
+  method copy_iobj_with_attributes.
+
+    data:
+      lv_iobjnm                    type rsiobjnm,
+      lwa_iobciobj                 type rsdiobciobj,
+      lwa_return                   type bapiret2,
+      lv_mtext                     type string.
+
+    field-symbols:
+      &lt;lwa_iobj_create&gt;            type ty_wa_iobj_create.
+
+    check p_dim = rs_c_true.
+
+    loop at t_iobj_create assigning &lt;lwa_iobj_create&gt;
+      where
+        f_processed = rs_c_false and
+        t_attributes is not initial.
+
+      "Set the processed flag for the InfoObject.
+      &lt;lwa_iobj_create&gt;-f_processed = rs_c_true.
+
+      "Set InfoObject name.
+      lv_iobjnm = &lt;lwa_iobj_create&gt;-v_iobjnm.
+
+      "If flagged in the selection screen update the InfoObject catalogue.
+      if p_updctg = rs_c_true and &lt;lwa_iobj_create&gt;-f_exists = rs_c_true.
+
+        "Delete all InfoObject catalogue references.
+        delete from rsdiobciobj where iobjnm = lv_iobjnm and objvers = 'A'.
+
+        lwa_iobciobj-infoobjcat = p_catg_d.
+        lwa_iobciobj-objvers    = 'A'.
+        lwa_iobciobj-iobjnm     = lv_iobjnm.
+
+        "Create InfoObject catalogue reference.
+        modify rsdiobciobj from lwa_iobciobj.
+
+      endif.
+
+      "Only create the Infobject if it doesn't already exist.
+      if &lt;lwa_iobj_create&gt;-f_exists = rs_c_false.
+
+        "Create the InfoObject as a copy of the BPC Dimension.
+        call function 'BAPI_IOBJ_CREATE'
+          exporting
+            details              = &lt;lwa_iobj_create&gt;-wa_details
+            infoobjcat           = p_catg_d
+          importing
+            infoobject           = lv_iobjnm
+            return               = lwa_return
+          tables
+            attributes           = &lt;lwa_iobj_create&gt;-t_attributes
+            navigationattributes = &lt;lwa_iobj_create&gt;-t_navigationattributes.
+
+        lv_mtext = lwa_return-message.
+        write: / lv_mtext.
+
+        if lwa_return-type = 'S'.
+          activate_iobj( lv_iobjnm ).
+        endif.
+
+      endif.
+
+    endloop.
+
+  endmethod.                    "copy_iobj_with_attributes
+
+  method add_to_transport.
+
+    data:
+      lv_objname                   type trobj_name,
+      lv_mtext                     type string.
+
+    field-symbols:
+      &lt;lwa_iobj_create&gt;            type ty_wa_iobj_create.
+
+    check p_cts = rs_c_true.
+
+    loop at t_iobj_create assigning &lt;lwa_iobj_create&gt;.
+
+      "Set InfoObject name.
+      lv_objname = &lt;lwa_iobj_create&gt;-v_iobjnm.
+
+      call function 'TRINT_TADIR_POPUP_ENTRY_E071'
+        exporting
+          wi_e071_pgmid                   = 'R3TR'
+          wi_e071_object                  = 'IOBJ'
+          wi_e071_obj_name                = lv_objname
+<font color ="#0000FF">*   WI_MESSAGE_ENTER_DEVCLASS       = ' '</font>
+<font color ="#0000FF">*   WI_READ_ONLY                    = ' '</font>
+          wi_tadir_devclass               = 'ZBW'
+<font color ="#0000FF">*   WI_TADIR_GENFLAG                = ' '</font>
+<font color ="#0000FF">*   WI_TADIR_MASTERLANG             = ' '</font>
+<font color ="#0000FF">*   IV_WBO_INTERNAL                 = ' '</font>
+<font color ="#0000FF">*   IV_SUPPRESS_MOD_SHOW            = ' '</font>
+<font color ="#0000FF">* IMPORTING</font>
+<font color ="#0000FF">*   WE_TADIR                        =</font>
+<font color ="#0000FF">*   ES_TDEVC                        =</font>
+<font color ="#0000FF">*   EV_DELETED                      =</font>
+        exceptions
+          display_mode                    = 1
+          exit                            = 2
+          global_tadir_insert_error       = 3
+          no_repair_selected              = 4
+          no_systemname                   = 5
+          no_systemtype                   = 6
+          no_tadir_type                   = 7
+          reserved_name                   = 8
+          tadir_enqueue_failed            = 9
+          devclass_not_found              = 10
+          tadir_not_exist                 = 11
+          object_exists                   = 12
+          internal_error                  = 13
+          object_append_error             = 14
+          tadir_modify_error              = 15
+          object_locked                   = 16
+          no_object_authority             = 17
+          others                          = 18.
+      if sy-subrc &lt;&gt; 0.
+        sy-subrc = 0.
+      endif.
+
+    endloop.
+
+  endmethod.                    "create_tadir
+
+  method _change_tech_names.
+
+    field-symbols:
+      &lt;lwa_attributes&gt;             type bapi6108at,
+      &lt;lwa_navigationattributes&gt;   type bapi6108an.
+
+    clear rwa_iobj_create.
+
+    "Convert and set the InfoObject name.
+    rwa_iobj_create-v_iobjnm = replace( val = iwa_iobj_detail-wa_details-infoobject sub = '/CPMB/' with = 'Z' ).
+
+    "Check if InfoObject already exists.
+    if lcl=&gt;_check_iobj_exists( rwa_iobj_create-v_iobjnm ) = rs_c_true.
+      rwa_iobj_create-f_exists = rs_c_true.
+    endif.
+
+    "Copy work area for InfoObject details.
+    rwa_iobj_create-wa_details = iwa_iobj_detail-wa_details.
+
+    "Change technical names.
+    replace '/CPMB/' in rwa_iobj_create-wa_details-infoobject with 'Z'.
+    replace '/B28/S_' in rwa_iobj_create-wa_details-fieldnm with '/BIC/Z'.
+    replace '/CPMB/' in rwa_iobj_create-wa_details-chabasnm with 'Z'.
+
+    "Set the InfoArea.
+    if rwa_iobj_create-wa_details-infoarea is not initial.
+      rwa_iobj_create-wa_details-infoarea = 'ZIA_SU_PRD_BPCO'.
+    endif.
+
+    "Copy table for InfoObject attributes.
+    rwa_iobj_create-t_attributes = iwa_iobj_detail-t_attributes.
+
+    "Change technical names.
+    loop at rwa_iobj_create-t_attributes assigning &lt;lwa_attributes&gt;.
+
+      &lt;lwa_attributes&gt;-chabasnm = replace( val = &lt;lwa_attributes&gt;-chabasnm sub = '/CPMB/' with = 'Z' ).
+      &lt;lwa_attributes&gt;-attrinm = replace( val = &lt;lwa_attributes&gt;-attrinm sub = '/CPMB/' with = 'Z' ).
+
+    endloop.
+
+    "Copy table for InfoObject navigational attributes.
+    rwa_iobj_create-t_navigationattributes = iwa_iobj_detail-t_navigationattributes.
+
+    "Change technical names.
+    loop at rwa_iobj_create-t_navigationattributes assigning &lt;lwa_navigationattributes&gt;.
+
+      &lt;lwa_navigationattributes&gt;-chanm = replace( val = &lt;lwa_navigationattributes&gt;-chanm sub = '/CPMB/' with = 'Z' ).
+      &lt;lwa_navigationattributes&gt;-attrinm = replace( val = &lt;lwa_navigationattributes&gt;-attrinm sub = '/CPMB/' with = 'Z' ).
+      replace all occurrences of '/CPMB/' in &lt;lwa_navigationattributes&gt;-atrnavnm with 'Z'.
+
+    endloop.
+
+  endmethod.                    "change_tech_names
+
+
+  method activate_iobj.
+
+    data:
+      lv_infoobject                type bapi6108io,
+      lt_infoobjects               type table of bapi6108io,
+      lwa_return                   type bapiret2,
+      lt_return                    type table of bapiret2,
+      lt_infoobjects_error         type table of bapi6108io,
+      lv_mtext                     type string.
+
+    lv_infoobject = iv_iobjnm.
+    append lv_infoobject to lt_infoobjects.
+
+    call function 'BAPI_IOBJ_ACTIVATE_MULTIPLE'
+      tables
+        infoobjects       = lt_infoobjects
+        return            = lt_return
+        infoobjects_error = lt_infoobjects_error.
+
+    loop at lt_return into lwa_return.
+
+      lv_mtext = lwa_return-message.
+      write: / lv_mtext.
+
+    endloop.
+
+  endmethod.                    "activate_iobj
+
+  method _check_iobj_exists.
+
+    data:
+      lv_iobjnm                    type rsiobjnm,
+      lv_mtext                     type string.
+
+    select single iobjnm
+      into lv_iobjnm
+      from rsdiobj
+      where iobjnm = iv_iobjnm.
+    if sy-subrc = 0 and lv_iobjnm is not initial.
+
+      lv_mtext = |InfoObject already exists '{ lv_iobjnm }'|.
+      write: / lv_mtext.
+      rf_iobj_exists = rs_c_true.
+
+    else.
+      rf_iobj_exists = rs_c_false.
+    endif.
+
+  endmethod.                    "iobj_exists
+
+endclass.                    "lcl IMPLEMENTATION
+
+start-of-selection.
+
+  data:
+    lo_lcl                         type ref to lcl.
+
+  create object lo_lcl.
+
+  "Copy InfoObjects
+  lo_lcl-&gt;execute( ).
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* ARE Select InfoArea for Characteristics</font>
+<font color ="#0000FF">* CTG Select InfoObject Catalogue</font>
+<font color ="#0000FF">* OBJ Select Dimensions via InfoObject name</font>
+<font color ="#0000FF">* OPT Options</font>
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_AREA D       .</font>
+<font color ="#0000FF">* P_CATG_D         Dimensions</font>
+<font color ="#0000FF">* P_CATG_P         Properties</font>
+<font color ="#0000FF">* P_DIM         Copy Dimensions</font>
+<font color ="#0000FF">* P_PRO         Copy Properties</font>
+<font color ="#0000FF">* P_UPDCTG         Update catalogue</font>
+<font color ="#0000FF">* S_IOBJNM         Dimension InfoObjects</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>
