@@ -1,0 +1,405 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_CODE_TABLE_READ_PERFORMANCE</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_CODE_TABLE_READ_PERFORMANCE</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Demo code to test table read performance for time-dependency</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_CODE_TABLE_READ_PERFORMANCE</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This demo program explores the performance when using different</font>
+<font color ="#0000FF">*&  types of table reads, it uses the Payroll data as transaction data</font>
+<font color ="#0000FF">*&  and time-dependent Employee master data for this.</font>
+<font color ="#0000FF">*&  There is a static method for each table read type. The performance</font>
+<font color ="#0000FF">*&  can be analysed using transaction SAT. The results indicate that</font>
+<font color ="#0000FF">*&  so long as the master data is sorted the performance between the</font>
+<font color ="#0000FF">*&  options is similiar, thus the approach taken will often depend</font>
+<font color ="#0000FF">*&  on the preference of the developer.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_code_table_read_performance.
+
+load-of-program.
+
+  types:
+    begin of ty_wa_src,
+      calday                       type /bi0/oicalday,
+      employee                     type /bi0/oiemployee,
+    end of ty_wa_src.
+
+  types:
+    begin of ty_wa_tgt,
+      calday                       type /bi0/oicalday,
+      employee                     type /bi0/oiemployee,
+      hrposition                   type /bi0/oihrposition,
+    end of ty_wa_tgt.
+
+  types:
+    ty_t_src                       type table of ty_wa_src,
+    ty_t_tgt                       type table of ty_wa_tgt.
+
+  types:
+    begin of ty_wa_mdq_employee,
+      employee                     type /bi0/oiemployee,
+      dateto                       type /bi0/oidateto,
+      datefrom                     type /bi0/oidatefrom,
+      hrposition                   type /bi0/oihrposition,
+    end of ty_wa_mdq_employee.
+
+  types:
+    ty_t_mdq_employee              type table of ty_wa_mdq_employee with non-unique key table_line.
+
+  types:
+    ty_ts_mdq_employee             type sorted table of ty_wa_mdq_employee with non-unique key dateto datefrom.
+
+  types:
+    begin of ty_wa_mdq_employee_idx,
+      employee                     type /bi0/oiemployee,
+      ts_mdq_employee              type ty_ts_mdq_employee,
+    end of ty_wa_mdq_employee_idx.
+
+  types:
+    ty_th_mdq_employee_idx         type hashed table of ty_wa_mdq_employee_idx with unique key employee.
+
+  data:
+    lt_src                         type table of ty_wa_src,
+    lwa_tgt                        type ty_wa_tgt,
+    lt_tgt                         type table of ty_wa_tgt,
+    lt_tgt1                        type table of ty_wa_tgt,
+    lt_tgt2                        type table of ty_wa_tgt,
+    lt_tgt3                        type table of ty_wa_tgt,
+    lt_tgt4                        type table of ty_wa_tgt,
+    lt_tgt5                        type table of ty_wa_tgt,
+    lth_dv_employee                type hashed table of /bi0/oiemployee with unique key table_line,
+    lt_mdq_employee                type ty_t_mdq_employee,
+    lts_mdq_employee               type sorted table of ty_wa_mdq_employee
+                                       with non-unique key employee
+                                       with non-unique sorted key skey components employee dateto datefrom,
+    lwa_mdq_employee_idx           type ty_wa_mdq_employee_idx,
+    lth_mdq_employee_idx           type ty_th_mdq_employee_idx.
+
+  field-symbols:
+    &lt;lwa_src&gt;                      type ty_wa_src,
+    &lt;lwa_mdq_employee&gt;             type ty_wa_mdq_employee,
+    &lt;lwa_mdq_employee_idx&gt;         type ty_wa_mdq_employee_idx.
+
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&       Class LCL_OPTIONS</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*        Text</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl_read_options definition.
+
+  public section.
+
+    class-methods:
+      fill_deep_structure
+        importing
+          it_mdq_employee type ty_t_mdq_employee
+        exporting
+          eth_mdq_employee_idx type ty_th_mdq_employee_idx.
+
+    class-methods:
+      loop_at_standard_table
+        importing
+          it_src type ty_t_src
+        exporting
+          et_tgt type ty_t_tgt.
+
+    class-methods:
+      loop_at_sorted_table_use_pkey
+        importing
+          it_src type ty_t_src
+        exporting
+          et_tgt type ty_t_tgt.
+
+    class-methods:
+      loop_at_sorted_table_use_skey
+        importing
+          it_src type ty_t_src
+        exporting
+          et_tgt type ty_t_tgt.
+
+    class-methods:
+      read_sorted_table_and_index
+        importing
+          it_src type ty_t_src
+        exporting
+          et_tgt type ty_t_tgt.
+
+    class-methods:
+      read_deep_structure
+        importing
+          it_src type ty_t_src
+        exporting
+          et_tgt type ty_t_tgt.
+
+endclass.               "LCL_READ_OPTIONS
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&       Class LCL_OPTIONS</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*        Text</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl_read_options implementation.
+
+  method fill_deep_structure.
+
+    "Convert master data from a flat table into a deep structure.
+    loop at it_mdq_employee assigning &lt;lwa_mdq_employee&gt;.
+
+      read table eth_mdq_employee_idx assigning &lt;lwa_mdq_employee_idx&gt;
+        with table key
+          employee = &lt;lwa_mdq_employee&gt;-employee.
+      if sy-subrc &lt;&gt; 0.
+        lwa_mdq_employee_idx-employee = &lt;lwa_mdq_employee&gt;-employee.
+        insert lwa_mdq_employee_idx into table eth_mdq_employee_idx
+          assigning &lt;lwa_mdq_employee_idx&gt;.
+      endif.
+
+      insert &lt;lwa_mdq_employee&gt; into table &lt;lwa_mdq_employee_idx&gt;-ts_mdq_employee.
+
+    endloop.
+
+  endmethod.                    "fill_deep_structure
+
+  method loop_at_standard_table.
+
+    data:
+      lv_index                     type sy-index.
+
+    "Enrich data.
+    loop at it_src assigning &lt;lwa_src&gt;.
+
+      "Transfer source fields to target structure.
+      lwa_tgt-calday = &lt;lwa_src&gt;-calday.
+      lwa_tgt-employee = &lt;lwa_src&gt;-employee.
+
+      "Retrieve master data for employee.
+      loop at lt_mdq_employee assigning &lt;lwa_mdq_employee&gt;
+        where employee = &lt;lwa_src&gt;-employee and
+              datefrom &lt;= &lt;lwa_src&gt;-calday and
+              dateto &gt;= &lt;lwa_src&gt;-calday.
+
+        lwa_tgt-hrposition = &lt;lwa_mdq_employee&gt;-hrposition.
+        exit.
+
+      endloop.
+
+      append lwa_tgt to et_tgt.
+
+    endloop.
+
+  endmethod.                    "loop_at_standard_table
+
+  method loop_at_sorted_table_use_pkey.
+
+    "Enrich data.
+    loop at it_src assigning &lt;lwa_src&gt;.
+
+      "Transfer source fields to target structure.
+      lwa_tgt-calday = &lt;lwa_src&gt;-calday.
+      lwa_tgt-employee = &lt;lwa_src&gt;-employee.
+
+      "Retrieve master data for employee.
+      loop at lts_mdq_employee assigning &lt;lwa_mdq_employee&gt;
+        using key primary_key
+        where employee = &lt;lwa_src&gt;-employee.
+
+        "Find relevant time-dependent interval.
+        if &lt;lwa_src&gt;-calday between &lt;lwa_mdq_employee&gt;-datefrom and &lt;lwa_mdq_employee&gt;-dateto.
+
+          lwa_tgt-hrposition = &lt;lwa_mdq_employee&gt;-hrposition.
+          exit.
+
+        endif.
+      endloop.
+
+      append lwa_tgt to et_tgt.
+
+    endloop.
+
+  endmethod.                    "read_sorted_table
+
+  method loop_at_sorted_table_use_skey.
+
+    data:
+      lv_index                     type sy-index.
+
+    "Enrich data.
+    loop at it_src assigning &lt;lwa_src&gt;.
+
+      "Transfer source fields to target structure.
+      lwa_tgt-calday = &lt;lwa_src&gt;-calday.
+      lwa_tgt-employee = &lt;lwa_src&gt;-employee.
+
+      "Retrieve master data for employee.
+      loop at lts_mdq_employee assigning &lt;lwa_mdq_employee&gt;
+        using key skey
+        where employee = &lt;lwa_src&gt;-employee and
+              datefrom &lt;= &lt;lwa_src&gt;-calday and
+              dateto &gt;= &lt;lwa_src&gt;-calday.
+
+        lwa_tgt-hrposition = &lt;lwa_mdq_employee&gt;-hrposition.
+        exit.
+
+      endloop.
+
+      append lwa_tgt to et_tgt.
+
+    endloop.
+
+  endmethod.                    "loop_at_sorted_table
+
+  method read_sorted_table_and_index.
+
+    data:
+      lv_index                     type sy-index.
+
+    "Enrich data.
+    loop at it_src assigning &lt;lwa_src&gt;.
+
+      "Transfer source fields to target structure.
+      lwa_tgt-calday = &lt;lwa_src&gt;-calday.
+      lwa_tgt-employee = &lt;lwa_src&gt;-employee.
+
+      "Retrieve index of first record for employee.
+      read table lts_mdq_employee transporting no fields
+        with table key
+          employee = &lt;lwa_src&gt;-employee.
+      if sy-subrc = 0.
+        lv_index = sy-tabix.
+      endif.
+
+      "Retrieve master data for employee.
+      loop at lts_mdq_employee assigning &lt;lwa_mdq_employee&gt; from lv_index.
+
+        "Exit if the employee does not match source and reference data.
+        if &lt;lwa_mdq_employee&gt;-employee &lt;&gt; &lt;lwa_src&gt;-employee.
+          exit.
+        endif.
+
+        "Find relevant time-dependent interval.
+        if &lt;lwa_src&gt;-calday between &lt;lwa_mdq_employee&gt;-datefrom and &lt;lwa_mdq_employee&gt;-dateto.
+
+          lwa_tgt-hrposition = &lt;lwa_mdq_employee&gt;-hrposition.
+          exit.
+
+        endif.
+
+      endloop.
+
+      append lwa_tgt to et_tgt.
+
+    endloop.
+
+  endmethod.                    "read_sorted_table and index
+
+  method read_deep_structure.
+
+    "Enrich data.
+    loop at it_src assigning &lt;lwa_src&gt;.
+
+      "Transfer source fields to target structure.
+      lwa_tgt-calday = &lt;lwa_src&gt;-calday.
+      lwa_tgt-employee = &lt;lwa_src&gt;-employee.
+
+      "Retrieve master data for employee.
+      read table lth_mdq_employee_idx assigning &lt;lwa_mdq_employee_idx&gt;
+        with table key
+          employee = &lt;lwa_src&gt;-employee.
+      if sy-subrc = 0.
+
+        "Find relevant time-dependent interval.
+        loop at &lt;lwa_mdq_employee_idx&gt;-ts_mdq_employee assigning &lt;lwa_mdq_employee&gt;
+          where datefrom &lt;= &lt;lwa_src&gt;-calday and
+                dateto &gt;= &lt;lwa_src&gt;-calday.
+
+          lwa_tgt-hrposition = &lt;lwa_mdq_employee&gt;-hrposition.
+          exit.
+
+        endloop.
+
+        append lwa_tgt to et_tgt.
+
+      endif.
+
+    endloop.
+
+  endmethod.                    "read_deep_structure
+
+endclass.               "LCL_READ_OPTIONS
+
+start-of-selection.
+
+  "Simulate the source data for a data package.
+  select
+      fppay_date as calday
+      employee
+<font color ="#0000FF">*  up to 10000 rows</font>
+    into table lt_src
+    from /bic/azpy1o0100
+    where fppay_date &lt;&gt; ''
+    group by
+      fppay_date
+      employee.
+  if sy-subrc &lt;&gt; 0.
+    return.
+  endif.
+
+  "Collect source data.
+  loop at lt_src assigning &lt;lwa_src&gt;.
+    collect &lt;lwa_src&gt;-employee into lth_dv_employee.
+  endloop.
+
+  "Retrieve reference master data.
+  if lth_dv_employee is not initial.
+
+    select
+        employee
+        dateto
+        datefrom
+        hrposition
+      into table lt_mdq_employee
+      from /bi0/qemployee
+<font color ="#0000FF">*    for all entries in lth_dv_employee</font>
+      where "employee = lth_dv_employee-table_line and
+            objvers ='A'.
+    if sy-subrc = 0.
+
+      lcl_read_options=&gt;fill_deep_structure( exporting it_mdq_employee = lt_mdq_employee importing eth_mdq_employee_idx = lth_mdq_employee_idx ).
+
+      "Transfer master data from a standard table to a sorted table.
+      lts_mdq_employee = lt_mdq_employee.
+
+    endif.
+
+  endif.
+
+<font color ="#0000FF">*lcl_read_options=&gt;loop_at_standard_table( exporting it_src = lt_src importing et_tgt = lt_tgt1 ).</font>
+  lcl_read_options=&gt;loop_at_sorted_table_use_pkey( exporting it_src = lt_src importing et_tgt = lt_tgt2 ).
+  lcl_read_options=&gt;loop_at_sorted_table_use_skey( exporting it_src = lt_src importing et_tgt = lt_tgt3 ).
+  lcl_read_options=&gt;read_sorted_table_and_index( exporting it_src = lt_src importing et_tgt = lt_tgt4 ).
+  lcl_read_options=&gt;read_deep_structure( exporting it_src = lt_src importing et_tgt = lt_tgt5 ).
+
+  sort:
+    lt_tgt1,
+    lt_tgt2,
+    lt_tgt3,
+    lt_tgt4,
+    lt_tgt5.
+
+  return.
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

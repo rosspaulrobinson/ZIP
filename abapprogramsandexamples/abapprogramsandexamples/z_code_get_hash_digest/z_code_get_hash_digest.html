@@ -1,0 +1,87 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_CODE_GET_HASH_DIGEST</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_CODE_GET_HASH_DIGEST</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Demo generation of HASH digest from string</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_CODE_GET_HASH_DIGEST</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This demo program generates a HASH Digest based on a string.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_code_get_hash_digest.
+
+start-of-selection.
+
+  data:
+    lv_key                           type string,
+    lv_hashkey                       type string,
+    lt_hashkey                       type stringtab,
+    lwa_cdhdr                        type cdhdr,
+    lt_cdhdr                         type table of cdhdr.
+
+  select
+      objectclas
+      objectid
+      changenr
+    into table lt_cdhdr
+    from cdhdr.
+
+  loop at lt_cdhdr into lwa_cdhdr.
+
+    lv_key = |{ lwa_cdhdr-objectclas }{ lwa_cdhdr-objectid }{ lwa_cdhdr-changenr }|.
+
+
+    try.
+
+        call method cl_abap_message_digest=&gt;calculate_hash_for_char
+          exporting
+<font color ="#0000FF">*           if_algorithm     = 'SHA1'</font>
+            if_data          = lv_key
+<font color ="#0000FF">*           if_length        = 30</font>
+          importing
+            ef_hashstring    = lv_hashkey
+<font color ="#0000FF">*           ef_hashxstring   =</font>
+<font color ="#0000FF">*           ef_hashb64string =</font>
+<font color ="#0000FF">*           ef_hashx         =</font>
+          .
+
+      catch cx_abap_message_digest .
+    endtry.
+
+    append lv_hashkey to lt_hashkey.
+
+  endloop.
+
+  sort lt_hashkey.
+  delete adjacent duplicates from lt_hashkey.
+
+  return.
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* DIR Source directory</font>
+<font color ="#0000FF">* TAB Table parameters</font>
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_DIRCTY         Directory on server</font>
+<font color ="#0000FF">* P_FILENM         File name</font>
+<font color ="#0000FF">* P_FILETY         File extension</font>
+<font color ="#0000FF">* P_TABLNM         Table name</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

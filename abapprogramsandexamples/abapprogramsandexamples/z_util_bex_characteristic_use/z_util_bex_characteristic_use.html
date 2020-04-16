@@ -1,0 +1,1040 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_BEX_CHARACTERISTIC_USE</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_BEX_CHARACTERISTIC_USE</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  BEx characteristic where-used-list</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_BEX_CHARACTERISTIC_USE</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This program will allow you to see where a Characteristic is used</font>
+<font color ="#0000FF">*&  in BEx. The output shows if a charateristic is used as a Row,</font>
+<font color ="#0000FF">*&  Column or Free Characteristic.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_bex_characteristic_use.
+
+type-pools rzd1.
+
+data:
+  gv_area                          type rsinfoarea,
+  gv_prov                          type rsinfoprov,
+  gv_bqry                          type rszcompid,
+  gv_char                          type rschanm.
+
+selection-screen begin of block b1 with frame title text-sel.
+
+select-options area for gv_area.
+select-options prov for gv_prov.
+select-options bqry for gv_bqry.
+
+selection-screen end of block b1.
+
+selection-screen begin of block b2 with frame title text-flt.
+
+select-options char for gv_char.
+
+parameter p_filt   type rs_bool default rs_c_true.
+parameter p_filt_c type rs_bool default rs_c_true.
+parameter p_filt_d type rs_bool default rs_c_true.
+parameter p_free   type rs_bool default rs_c_true.
+parameter p_row    type rs_bool default rs_c_true.
+parameter p_col    type rs_bool default rs_c_true.
+
+selection-screen end of block b2.
+
+selection-screen begin of block b3 with frame title text-dis.
+
+parameter p_trans  type rs_bool default rs_c_false.
+parameter p_by_qry type rs_bool radiobutton group dis default 'X'.
+parameter p_by_cha type rs_bool radiobutton group dis.
+
+selection-screen end of block b3.
+
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl DEFINITION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl definition.
+
+  public section.
+
+    types:
+      ty_t_so_area                 type range of rsinfoarea,
+      ty_t_so_prov                 type range of rsinfoprov,
+      ty_t_so_bqry                 type range of rszcompid,
+      ty_t_so_char                 type range of rschanm.
+
+    types:
+      begin of ty_wa_qry_definition,
+        t_eltdir                   type rzd1_t_eltdir,
+        t_elttxt                   type rzd1_t_elttxt,
+        t_eltprop                  type rzd1_t_eltprop,
+        t_eltprio                  type rzd1_t_eltprio,
+        t_eltattr                  type rzd1_t_eltattr,
+        t_eltxref                  type rzd1_t_eltxref,
+        t_compdir                  type rzd1_t_compdir,
+        t_compic                   type rzd1_t_compic,
+        t_changes                  type rzd1_t_changes,
+        t_select                   type rzd1_t_select,
+        t_range                    type rzd1_t_range,
+        t_calc                     type rzd1_t_calc,
+        t_cel                      type rzd1_t_cel,
+        t_globv                    type rzd1_t_globv,
+      end of ty_wa_qry_definition,
+      ty_t_bqry                    type table of ty_wa_qry_definition.
+
+    types:
+      begin of ty_wa_cuse,
+        qrynm                      type rszcompid,
+        seqnr                      type i,
+        usage                      type z_bexq_usage,
+        chanm                      type rschanm,
+        varnm                      type rszvnam,
+        fltnm                      type z_bexq_fltnm,
+      end of ty_wa_cuse,
+      ty_t_cuse                    type table of ty_wa_cuse.
+
+    data:
+      t_so_area                    type ty_t_so_area,
+      t_so_prov                    type ty_t_so_prov,
+      t_so_bqry                    type ty_t_so_bqry,
+      t_so_char                    type ty_t_so_char.
+
+    data:
+      t_dv_compid                  type table of rszcompid,
+      t_cuse                       type ty_t_cuse.
+
+    class-methods
+      factory
+        importing
+          it_so_area               type ty_t_so_area
+          it_so_prov               type ty_t_so_prov
+          it_so_bqry               type ty_t_so_bqry
+          it_so_char               type ty_t_so_char
+        exporting
+          er_lcl                   type ref to lcl.
+
+    methods
+      execute.
+
+  private section.
+
+    methods
+      get_queries_based_on_selection.
+
+    methods
+      get_definition_for_query
+        importing
+          iv_compid                type rszcompid
+        returning
+          value(rwa_bqry)          type ty_wa_qry_definition.
+
+    methods
+      get_filter
+        importing
+          iv_compid                type rszcompid
+          iwa_bqry                 type ty_wa_qry_definition.
+
+    methods
+      get_rows_cols
+        importing
+          iv_compid                type rszcompid
+          iwa_bqry                 type ty_wa_qry_definition.
+
+    methods
+      get_characteristic_usage
+        importing
+          iv_compid                type rszcompid
+          iwa_bqry                 type ty_wa_qry_definition.
+
+    methods
+      filter.
+
+    methods
+      transpose
+        returning
+          value(rr_data)           type ref to data.
+
+    methods
+      transpose_by_qrynm
+        returning
+          value(rr_data)           type ref to data.
+
+    methods
+      transpose_by_chanm
+        returning
+          value(rr_data)           type ref to data.
+
+    methods
+      output.
+
+endclass.                    "lcl DEFINITION
+
+at selection-screen on block b1.
+
+  return.
+
+start-of-selection.
+
+  data:
+    lcl                            type ref to lcl.
+
+  call method lcl=&gt;factory
+    exporting
+      it_so_area = area[]
+      it_so_prov = prov[]
+      it_so_bqry = bqry[]
+      it_so_char = char[]
+    importing
+      er_lcl     = lcl.
+
+  call method lcl-&gt;execute( ).
+
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl IMPLEMENTATION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl implementation.
+
+  method factory.
+
+    create object er_lcl type lcl.
+
+    "Set factory variables.
+    er_lcl-&gt;t_so_area = it_so_area.
+    er_lcl-&gt;t_so_prov = it_so_prov.
+    er_lcl-&gt;t_so_bqry = it_so_bqry.
+    er_lcl-&gt;t_so_char = it_so_char.
+
+  endmethod.                    "factory
+
+  method execute.
+
+    data:
+      lv_compid                    type rszcompid,
+      lwa_qry_definition                     type ty_wa_qry_definition.
+
+    "Retrieve BEx query names based on selection.
+    get_queries_based_on_selection( ).
+
+    "Process each query in the selection.
+    loop at t_dv_compid into lv_compid.
+
+      "Retrieve query definition.
+      lwa_qry_definition = get_definition_for_query( lv_compid ).
+
+      "Derive characteristic use for query.
+      get_characteristic_usage( exporting iv_compid = lv_compid iwa_bqry = lwa_qry_definition ).
+
+    endloop.
+
+    "Filter results.
+    filter( ).
+
+    "Display results.
+    output( ).
+
+  endmethod.                    "execute
+
+  method get_queries_based_on_selection.
+
+    clear t_dv_compid.
+
+    "Retrieve query names.
+    if area is initial.
+
+      "Retrieve query names for InfoProvider selection.
+      select
+          r~compid
+        into table t_dv_compid
+        from rsrrepdir as r
+        join rszcompdir as q
+          on r~compuid = q~compuid and
+             r~objvers = q~objvers
+        where infocube in prov and
+             r~compid in t_so_bqry and
+             r~objvers = 'A'
+        group by r~compid.
+
+    else.
+
+      "Retrieve query names for InfoCube and InfoArea selection.
+      select
+          r~compid
+        appending table t_dv_compid
+        from rsrrepdir as r
+        join rszcompdir as q
+          on r~compuid = q~compuid and
+             r~objvers = q~objvers
+        join rsdcube as c
+          on r~infocube = c~infocube and
+             r~objvers  = c~objvers
+        where c~infoarea in t_so_area and
+              r~infocube in t_so_prov and
+              r~compid in t_so_bqry and
+              r~objvers = 'A'
+        group by r~compid.
+
+      "Retrieve query names for DSO and InfoArea selection.
+      select
+          r~compid
+        appending table t_dv_compid
+        from rsrrepdir as r
+        join rszcompdir as q
+          on r~compuid = q~compuid and
+             r~objvers = q~objvers
+        join rsdodso as o
+          on r~infocube = o~odsobject and
+             r~objvers  = o~objvers
+        where o~infoarea in t_so_area and
+              r~infocube in t_so_prov and
+              r~compid in t_so_bqry and
+              r~objvers = 'A'
+        group by r~compid.
+
+    endif.
+
+  endmethod.                    "get_queries_based_on_selection
+
+  method get_definition_for_query.
+
+    call function 'RSZ_0_DB_COMP_GET'
+      exporting
+        i_compid            = iv_compid
+        i_objvers           = rs_c_objvers-active
+      importing
+        e_t_eltdir          = rwa_bqry-t_eltdir
+        e_t_elttxt          = rwa_bqry-t_elttxt
+        e_t_eltprop         = rwa_bqry-t_eltprop
+        e_t_eltprio         = rwa_bqry-t_eltprio
+        e_t_eltattr         = rwa_bqry-t_eltattr
+        e_t_eltxref         = rwa_bqry-t_eltxref
+        e_t_compdir         = rwa_bqry-t_compdir
+        e_t_compic          = rwa_bqry-t_compic
+        e_t_changes         = rwa_bqry-t_changes
+        e_t_select          = rwa_bqry-t_select
+        e_t_range           = rwa_bqry-t_range
+        e_t_calc            = rwa_bqry-t_calc
+        e_t_cel             = rwa_bqry-t_cel
+        e_t_globv           = rwa_bqry-t_globv
+      exceptions
+        component_not_found = 1
+        others              = 2.
+    if sy-subrc &lt;&gt; 0.
+      clear rwa_bqry.
+      return.
+    endif.
+
+  endmethod.                    "get_definition_for_query
+
+  method get_characteristic_usage.
+
+    data:
+      lwa_eltdir                   type rzd1_s_eltdir,
+      lwa_eltxref                  type rzd1_s_eltxref,
+      lwa_select                   type rzd1_s_select,
+      lwa_range                    type rzd1_s_range,
+      lwa_globv                    type rzd1_s_globv.
+
+    data:
+      lv_rep_uid                   type sysuuid_25,
+      lwa_cuse                     type ty_wa_cuse.
+
+    data:
+      lv_vari_count                type i,
+      lv_varnm                     type rszvnam.
+
+
+    field-symbols:
+      &lt;lwa_cuse&gt;                   type ty_wa_cuse.
+
+    "Get the characteristic usages in filters.
+    get_filter( exporting iv_compid = iv_compid iwa_bqry = iwa_bqry ).
+
+    "Get the characteristic usages in rows, columns and free characteristics.
+    get_rows_cols( exporting iv_compid = iv_compid iwa_bqry = iwa_bqry ).
+
+    "Set the sort sequence.
+    loop at t_cuse assigning &lt;lwa_cuse&gt;.
+
+      case &lt;lwa_cuse&gt;-usage.
+        when 'FILTER'.
+          &lt;lwa_cuse&gt;-seqnr = 1.
+        when 'FILTER RESTRICTION'.
+          &lt;lwa_cuse&gt;-seqnr = 2.
+        when 'FILTER DEFAULT'.
+          &lt;lwa_cuse&gt;-seqnr = 3.
+        when 'REUSE_FILTER'.
+          &lt;lwa_cuse&gt;-seqnr = 3.
+        when 'FREE'.
+          &lt;lwa_cuse&gt;-seqnr = 4.
+        when 'ROW'.
+          &lt;lwa_cuse&gt;-seqnr = 5.
+        when 'COL'.
+          &lt;lwa_cuse&gt;-seqnr = 6.
+      endcase.
+    endloop.
+
+    "Sort the output.
+    sort t_cuse by qrynm seqnr fltnm chanm.
+
+  endmethod.                    "get_characteristic_usage
+
+  method get_filter.
+
+    data:
+      lwa_eltxref_parent           type rzd1_s_eltxref,
+      lwa_eltxref_child            type rzd1_s_eltxref,
+      lwa_eltxref_grandchild       type rzd1_s_eltxref.
+
+    data:
+      lwa_compdir                  type rzd1_s_compdir,
+      lwa_eltdir                   type rzd1_s_eltdir,
+      lwa_eltxref                  type rzd1_s_eltxref,
+      lwa_select                   type rzd1_s_select,
+      lwa_range                    type rzd1_s_range,
+      lwa_globv                    type rzd1_s_globv.
+
+    data:
+      lv_rep_uid                   type sysuuid_25,
+      lwa_cuse                     type ty_wa_cuse.
+
+    data:
+      lv_vari_count                type i,
+      lv_varnm                     type rszvnam.
+
+
+    field-symbols:
+      &lt;lwa_cuse&gt;                   type ty_wa_cuse.
+
+    "Get the Unique ID for the BEx query.
+    read table iwa_bqry-t_eltdir into lwa_eltdir
+      with key
+        deftp    = 'REP'.
+    if sy-subrc = 0.
+      lv_rep_uid = lwa_eltdir-eltuid.
+    endif.
+
+    "Loop where cross-reference is Query -&gt; Filter.
+    loop at iwa_bqry-t_eltxref into lwa_eltxref where seltuid = lv_rep_uid and laytp = 'SOB'.
+
+      loop at iwa_bqry-t_eltxref into lwa_eltxref where seltuid = lwa_eltxref-teltuid and laytp = 'AGG'.
+
+        "Retrieve the Filter sub-type.
+        read table iwa_bqry-t_select into lwa_select
+          with key
+            eltuid = lwa_eltxref-teltuid.
+        case lwa_select-sotp.
+          when '1'.
+            lwa_cuse-usage = |FILTER RESTRICTION|.
+          when '2'.
+            lwa_cuse-usage = |FILTER DEFAULT|.
+          when others.
+            lwa_cuse-usage = 'FILTER'.
+        endcase.
+
+        read table iwa_bqry-t_range into lwa_range
+          with key
+            eltuid = lwa_eltxref-teltuid.
+        if sy-subrc = 0.
+
+          "Clear the variable reference counter.
+          clear lv_vari_count.
+
+          "Loop where cross-reference is Characteristic -&gt; Variable.
+          loop at iwa_bqry-t_eltxref into lwa_eltxref where seltuid = lwa_eltxref-teltuid and laytp = 'NIL'.
+
+            "Count the number of variables referenced by the characteristic.
+            add 1 to lv_vari_count.
+
+          endloop.
+
+          "If no Variable is referenced by the Characteristic.
+          if lv_vari_count = 0.
+
+            clear lv_varnm.
+
+            "If a single Variable is referenced by the Characteristic.
+          elseif lv_vari_count = 1.
+
+            "Retrieve the technical name of the variable.
+            read table iwa_bqry-t_globv into lwa_globv
+              with key
+                varuniid = lwa_eltxref-teltuid.
+            if sy-subrc = 0.
+              lv_varnm  = lwa_globv-vnam.
+            else.
+              clear lv_varnm.
+            endif.
+
+            "If more than one Variable is referenced by the Characteristic.
+          else.
+            lv_varnm = 'Multiple...'.
+
+          endif.
+
+          lwa_cuse-chanm = lwa_range-iobjnm.
+          lwa_cuse-qrynm = iv_compid.
+          lwa_cuse-varnm = lv_varnm.
+          append lwa_cuse to t_cuse.
+
+        endif.
+
+      endloop.
+
+    endloop.
+
+<font color ="#0000FF">*/ For re-usable Filters, the cross-reference depth is 4 when a variable</font>
+<font color ="#0000FF">*  is referenced, or 3 where a characteristic value is fixed. The layout</font>
+<font color ="#0000FF">*  type of the children is SOB, SOB, AGG and NIL.</font>
+
+    "Loop where cross-reference is Query -&gt; Filter.
+    loop at iwa_bqry-t_eltxref into lwa_eltxref_parent where seltuid = lv_rep_uid and laytp = 'SOB'.
+
+      "Loop where cross-reference is Filter -&gt; Filter Object.
+      loop at iwa_bqry-t_eltxref into lwa_eltxref_child where seltuid = lwa_eltxref_parent-teltuid and laytp = 'SOB'.
+
+        "Loop where cross-reference is Filter Object -&gt; Characteristic.
+        loop at iwa_bqry-t_eltxref into lwa_eltxref_grandchild where seltuid = lwa_eltxref_child-teltuid and laytp = 'AGG'.
+
+          "Retrieve the Filter sub-type.
+          read table iwa_bqry-t_select into lwa_select
+            with key
+              eltuid = lwa_eltxref_grandchild-teltuid.
+          case lwa_select-sotp.
+            when '1'.
+              lwa_cuse-usage = |FILTER RESTRICTION|.
+            when '2'.
+              lwa_cuse-usage = |FILTER DEFAULT|.
+            when others.
+              lwa_cuse-usage = 'FILTER'.
+          endcase.
+
+          "Retrieve the technical name for the re-usable Filter.
+          read table iwa_bqry-t_compdir into lwa_compdir
+            with key
+              compuid = lwa_eltxref_grandchild-seltuid.
+          if sy-subrc = 0.
+            lwa_cuse-fltnm = lwa_compdir-compid.
+          endif.
+
+          "Retrieve the characteristic for the element.
+          read table iwa_bqry-t_select into lwa_select
+            with key
+              eltuid = lwa_eltxref_grandchild-teltuid.
+          if sy-subrc = 0.
+
+            "Clear the variable reference counter.
+            clear lv_vari_count.
+
+            "Loop where cross-reference is Characteristic -&gt; Variable.
+<font color ="#0000FF">*            loop at iwa_bqry-t_eltxref into lwa_eltxref where seltuid = lwa_eltxref_grandchild-teltuid and laytp = 'NIL'.</font>
+            loop at iwa_bqry-t_eltxref into lwa_eltxref where seltuid = lwa_eltxref_grandchild-teltuid and laytp = 'NIL'.
+
+              "Count the number of variables referenced by the characteristic.
+              add 1 to lv_vari_count.
+
+            endloop.
+
+            "If no Variable is referenced by the Characteristic.
+            if lv_vari_count = 0.
+
+              clear lv_varnm.
+
+              "If a single Variable is referenced by the Characteristic.
+            elseif lv_vari_count = 1.
+
+              "Retrieve the technical name of the variable.
+              read table iwa_bqry-t_globv into lwa_globv
+                with key
+                  varuniid = lwa_eltxref-teltuid.
+              if sy-subrc = 0.
+                lv_varnm  = lwa_globv-vnam.
+              else.
+                clear lv_varnm.
+              endif.
+
+              "If more than one Variable is referenced by the Characteristic.
+            else.
+              lv_varnm = 'Multiple...'.
+
+            endif.
+
+            lwa_cuse-chanm = lwa_select-iobjnm.
+            lwa_cuse-qrynm = iv_compid.
+<font color ="#0000FF">*            lwa_cuse-usage = 'REUSE_FILTER'.</font>
+            lwa_cuse-varnm = lv_varnm.
+            append lwa_cuse to t_cuse.
+
+          endif.
+
+        endloop.
+
+      endloop.
+
+    endloop.
+
+  endmethod.                    "get_filter
+
+  method get_rows_cols.
+
+    data:
+      lwa_eltdir                   type rzd1_s_eltdir,
+      lwa_eltxref                  type rzd1_s_eltxref,
+      lwa_select                   type rzd1_s_select,
+      lwa_range                    type rzd1_s_range,
+      lwa_globv                    type rzd1_s_globv.
+
+    data:
+      lv_rep_uid                   type sysuuid_25,
+      lwa_cuse                     type ty_wa_cuse.
+
+    data:
+      lv_vari_count                type i,
+      lv_varnm                     type rszvnam.
+
+
+    field-symbols:
+      &lt;lwa_cuse&gt;                   type ty_wa_cuse.
+
+    "Get the Unique ID for the BEx query.
+    read table iwa_bqry-t_eltdir into lwa_eltdir
+      with key
+        deftp    = 'REP'.
+    if sy-subrc = 0.
+      lv_rep_uid = lwa_eltdir-eltuid.
+    endif.
+
+    loop at iwa_bqry-t_eltxref into lwa_eltxref where seltuid = lv_rep_uid and laytp = 'SHT'.
+
+      loop at iwa_bqry-t_eltxref into lwa_eltxref where seltuid = lwa_eltxref-teltuid.
+
+        case lwa_eltxref-laytp.
+          when 'AGG'.
+            lwa_cuse-usage = 'FREE'.
+          when 'ROW'.
+            lwa_cuse-usage = 'ROW'.
+          when 'COL'.
+            lwa_cuse-usage = 'COL'.
+          when others.
+            continue.
+        endcase.
+
+        read table iwa_bqry-t_select into lwa_select
+          with key
+            eltuid = lwa_eltxref-teltuid.
+        if sy-subrc = 0.
+
+          lwa_cuse-chanm = lwa_select-iobjnm.
+          lwa_cuse-qrynm = iv_compid.
+          append lwa_cuse to t_cuse.
+
+        endif.
+
+      endloop.
+
+    endloop.
+
+  endmethod.                    "get_characteristic_usage
+
+  method filter.
+
+    if t_so_char is not initial.
+      delete t_cuse where not ( chanm in t_so_char ).
+    endif.
+
+    if p_filt = rs_c_false.
+      delete t_cuse where usage = 'FILTER'.
+    endif.
+
+    if p_filt_c = rs_c_false.
+      delete t_cuse where usage = 'FILTER RESTRICTION'.
+    endif.
+
+    if p_filt_d = rs_c_false.
+      delete t_cuse where usage = 'FILTER DEFAULT'.
+    endif.
+
+    if p_free = rs_c_false.
+      delete t_cuse where usage = 'FREE'.
+    endif.
+
+    if p_row = rs_c_false.
+      delete t_cuse where usage = 'ROW'.
+    endif.
+
+    if p_col = rs_c_false.
+      delete t_cuse where usage = 'COL'.
+    endif.
+
+  endmethod.                    "filter
+
+  method transpose.
+
+    data:
+      lt_data                      type ref to data.
+
+    if p_by_qry = rs_c_true.
+
+      lt_data = transpose_by_qrynm( ).
+
+    else.
+
+      lt_data = transpose_by_chanm( ).
+
+    endif.
+
+    rr_data = lt_data.
+
+  endmethod.                    "transpose
+
+  method transpose_by_qrynm.
+
+    data:
+      lwa_cuse                     type ty_wa_cuse,
+      lt_cuse                      type ty_t_cuse.
+
+    data:
+      lv_qrynm                     type rszcompid,
+      lt_dv_qrynm                  type table of rszcompid.
+
+    data:
+      lv_chanm                     type rschanm,
+      lt_dv_chanm                  type table of rschanm.
+
+    data:
+      lr_data                      type ref to data.
+
+    data:
+      lwa_data                         type ref to data,
+      lt_data                          type ref to data.
+
+    data:
+      lo_typedescr                     type ref to cl_abap_typedescr,
+      lo_structdescr                   type ref to cl_abap_structdescr,
+      lwa_component                    type abap_componentdescr,
+      lt_component                     type abap_component_tab.
+
+    data:
+      lv_component                     type string.
+
+    field-symbols:
+      &lt;lv_data&gt;                        type any,
+      &lt;lwa_data&gt;                       type any,
+      &lt;lt_data&gt;                        type standard table.
+
+    lt_cuse = t_cuse.
+
+    delete lt_cuse where not ( usage = 'FREE' or usage = 'ROW' or usage = 'COL' ).
+
+    loop at lt_cuse into lwa_cuse.
+
+      collect lwa_cuse-qrynm into lt_dv_qrynm.
+      collect lwa_cuse-chanm into lt_dv_chanm.
+
+    endloop.
+
+    create data lr_data type rszcompid.
+    lo_typedescr = cl_abap_typedescr=&gt;describe_by_data_ref( lr_data ).
+
+    lwa_component-name = 'QRYNM'.
+    lwa_component-type ?= lo_typedescr.
+    append lwa_component to lt_component.
+
+    "Create structure.
+    loop at lt_dv_chanm into lv_chanm.
+
+      create data lr_data type rschanm.
+      lo_typedescr = cl_abap_typedescr=&gt;describe_by_data_ref( lr_data ).
+
+      lwa_component-name = |_{ lv_chanm }|.
+      lwa_component-type ?= lo_typedescr.
+      append lwa_component to lt_component.
+
+    endloop.
+
+    "Create a structure definition based on the field definitions.
+    try.
+
+        call method cl_abap_structdescr=&gt;create
+          exporting
+            p_components = lt_component
+          receiving
+            p_result     = lo_structdescr.
+
+      catch cx_sy_struct_creation .
+    endtry.
+
+    try.
+
+        "Create a work area based on the structure definition.
+        create data lwa_data type handle lo_structdescr.
+        assign lwa_data-&gt;* to &lt;lwa_data&gt;.
+
+        "Create an internal table data object based on the work area.
+        create data lt_data like table of &lt;lwa_data&gt;.
+        assign lt_data-&gt;* to &lt;lt_data&gt;.
+
+      catch cx_sy_ref_is_initial.
+    endtry.
+
+    sort lt_cuse by chanm.
+
+    loop at lt_cuse into lwa_cuse.
+
+      read table &lt;lt_data&gt; assigning &lt;lwa_data&gt;
+        with key
+          ('QRYNM') = lwa_cuse-qrynm.
+      if sy-subrc &lt;&gt; 0.
+
+        append initial line to &lt;lt_data&gt; assigning &lt;lwa_data&gt;.
+        assign component 'QRYNM' of structure &lt;lwa_data&gt; to &lt;lv_data&gt;.
+        &lt;lv_data&gt; = lwa_cuse-qrynm.
+
+      endif.
+
+      lv_component = |_{ lwa_cuse-chanm }|.
+
+      assign component lv_component of structure &lt;lwa_data&gt; to &lt;lv_data&gt;.
+
+      &lt;lv_data&gt; = lwa_cuse-usage.
+
+    endloop.
+
+    rr_data = lt_data.
+
+  endmethod.                    "transpose_by_qrynm
+
+  method transpose_by_chanm.
+
+    data:
+      lwa_cuse                     type ty_wa_cuse,
+      lt_cuse                      type ty_t_cuse.
+
+    data:
+      lv_qrynm                     type rszcompid,
+      lt_dv_qrynm                  type table of rszcompid.
+
+    data:
+      lv_chanm                     type rschanm,
+      lt_dv_chanm                  type table of rschanm.
+
+    data:
+      lr_data                      type ref to data.
+
+    data:
+      lwa_data                         type ref to data,
+      lt_data                          type ref to data.
+
+    data:
+      lo_typedescr                     type ref to cl_abap_typedescr,
+      lo_structdescr                   type ref to cl_abap_structdescr,
+      lwa_component                    type abap_componentdescr,
+      lt_component                     type abap_component_tab.
+
+    data:
+      lv_component                     type string.
+
+    field-symbols:
+      &lt;lv_data&gt;                        type any,
+      &lt;lwa_data&gt;                       type any,
+      &lt;lt_data&gt;                        type standard table.
+
+    lt_cuse = t_cuse.
+
+    delete lt_cuse where not ( usage = 'FREE' or usage = 'ROW' or usage = 'COL' ).
+
+    loop at lt_cuse into lwa_cuse.
+
+      collect lwa_cuse-qrynm into lt_dv_qrynm.
+      collect lwa_cuse-chanm into lt_dv_chanm.
+
+    endloop.
+
+    create data lr_data type rszcompid.
+    lo_typedescr = cl_abap_typedescr=&gt;describe_by_data_ref( lr_data ).
+
+    lwa_component-name = 'CHANM'.
+    lwa_component-type ?= lo_typedescr.
+    append lwa_component to lt_component.
+
+    "Create structure.
+    loop at lt_dv_qrynm into lv_qrynm.
+
+      create data lr_data type rszcompid.
+      lo_typedescr = cl_abap_typedescr=&gt;describe_by_data_ref( lr_data ).
+
+      lwa_component-name = |_{ lv_qrynm }|.
+      lwa_component-type ?= lo_typedescr.
+      append lwa_component to lt_component.
+
+    endloop.
+
+    "Create a structure definition based on the field definitions.
+    try.
+
+        call method cl_abap_structdescr=&gt;create
+          exporting
+            p_components = lt_component
+          receiving
+            p_result     = lo_structdescr.
+
+      catch cx_sy_struct_creation .
+    endtry.
+
+    try.
+
+        "Create a work area based on the structure definition.
+        create data lwa_data type handle lo_structdescr.
+        assign lwa_data-&gt;* to &lt;lwa_data&gt;.
+
+        "Create an internal table data object based on the work area.
+        create data lt_data like table of &lt;lwa_data&gt;.
+        assign lt_data-&gt;* to &lt;lt_data&gt;.
+
+      catch cx_sy_ref_is_initial.
+    endtry.
+
+    sort lt_cuse by chanm.
+
+    loop at lt_cuse into lwa_cuse.
+
+      read table &lt;lt_data&gt; assigning &lt;lwa_data&gt;
+        with key
+          ('CHANM') = lwa_cuse-CHAnm.
+      if sy-subrc &lt;&gt; 0.
+
+        append initial line to &lt;lt_data&gt; assigning &lt;lwa_data&gt;.
+        assign component 'CHANM' of structure &lt;lwa_data&gt; to &lt;lv_data&gt;.
+        &lt;lv_data&gt; = lwa_cuse-chanm.
+
+      endif.
+
+      lv_component = |_{ lwa_cuse-qrynm }|.
+
+      assign component lv_component of structure &lt;lwa_data&gt; to &lt;lv_data&gt;.
+
+      &lt;lv_data&gt; = lwa_cuse-usage.
+
+    endloop.
+
+    rr_data = lt_data.
+
+  endmethod.                    "transpose_bychanm
+
+  method output.
+
+    data:
+      lo_table                       type ref to cl_salv_table,
+      lo_columns                     type ref to cl_salv_columns_table,
+      lo_column                      type ref to cl_salv_column,
+      lv_columnname                  type lvc_fname,
+      lo_functions                   type ref to cl_salv_functions,
+      lt_column_ref                  type salv_t_column_ref,
+      lwa_column_ref                 type salv_s_column_ref,
+      lv_text_s                      type scrtext_s,
+      lv_text_m                      type scrtext_m,
+      lv_text_l                      type scrtext_l.
+
+    data:
+      lr_data                        type ref to data.
+
+    field-symbols:
+      &lt;lt_data&gt;                      type standard table.
+
+    if p_trans = rs_c_true.
+
+      lr_data = transpose( ).
+      assign lr_data-&gt;* to &lt;lt_data&gt;.
+
+    else.
+
+      assign t_cuse to &lt;lt_data&gt;.
+
+    endif.
+
+    try.
+
+        cl_salv_table=&gt;factory( importing r_salv_table = lo_table changing t_table = &lt;lt_data&gt; ).
+
+      catch cx_salv_msg.
+    endtry.
+
+    lo_functions = lo_table-&gt;get_functions( ).
+    lo_functions-&gt;set_all( abap_true ).
+
+    try.
+
+        lo_columns = lo_table-&gt;get_columns( ).
+        lo_columns-&gt;set_optimize( rs_c_true ).
+
+
+        if p_trans = rs_c_true.
+
+          lt_column_ref = lo_columns-&gt;get( ).
+
+          loop at lt_column_ref into lwa_column_ref.
+
+            lo_column = lo_columns-&gt;get_column( lwa_column_ref-columnname ).
+
+            if lwa_column_ref-columnname(1) = '_'.
+
+              lv_text_l = lwa_column_ref-columnname+1.
+              lo_column-&gt;set_short_text( '' ).
+              lo_column-&gt;set_medium_text( '' ).
+              lo_column-&gt;set_long_text( lv_text_l ).
+
+            endif.
+
+          endloop.
+
+        endif.
+
+      catch cx_salv_not_found.
+    endtry.
+
+    lo_table-&gt;display( ).
+
+  endmethod.                    "output
+
+endclass.                    "lcl IMPLEMENTATION
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* DIS Display options</font>
+<font color ="#0000FF">* FLT Filter results</font>
+<font color ="#0000FF">* SEL BEx query selection</font>
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* AREA D       .</font>
+<font color ="#0000FF">* BQRY D       .</font>
+<font color ="#0000FF">* CHAR D       .</font>
+<font color ="#0000FF">* PROV D       .</font>
+<font color ="#0000FF">* P_BY_CHA         By Characteristic Name</font>
+<font color ="#0000FF">* P_BY_QRY         By Query Name</font>
+<font color ="#0000FF">* P_COL         Columns</font>
+<font color ="#0000FF">* P_FILT         Filters</font>
+<font color ="#0000FF">* P_FILT_C         Characteristics filters</font>
+<font color ="#0000FF">* P_FILT_D         Default filters</font>
+<font color ="#0000FF">* P_FREE         Free characteristics</font>
+<font color ="#0000FF">* P_ROW         Rows</font>
+<font color ="#0000FF">* P_TRANS         Transpose Rows/Columns</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

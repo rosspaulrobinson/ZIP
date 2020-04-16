@@ -1,0 +1,1802 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_104087_CREATE_AA_AND_ROLES</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_104087_CREATE_AA_AND_ROLES</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Create Analysis Auths and Roles</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_104087_CREATE_AA_AND_ROLES</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_104087_create_aa_and_roles.
+
+tables:
+  sscrfields,
+  zzx_auth_aac.
+
+selection-screen function key 1.
+selection-screen function key 2.
+
+selection-screen begin of block b1 with frame title text-sel.
+select-options s_brlid for zzx_auth_aac-brlid.
+select-options s_iarea for zzx_auth_aac-iarea.
+select-options s_posit for zzx_auth_aac-posit.
+selection-screen end of block b1.
+
+selection-screen begin of block b2 with frame title text-opt.
+parameters p_simul8 type rs_bool default 'X'.
+parameters p_gen8id type rs_bool default 'X'.
+parameters p_gen8aa type rs_bool default 'X'.
+parameters p_gen8rl type rs_bool default 'X'.
+selection-screen end of block b2.
+
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl DEFINITION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl definition.
+
+  public section.
+
+<font color ="#0000FF">*    types:</font>
+<font color ="#0000FF">*      begin of ty_wa_cvc,</font>
+<font color ="#0000FF">*        auorg                           type z_auth_auorg,</font>
+<font color ="#0000FF">*        aupsa                           type z_auth_aupsa,</font>
+<font color ="#0000FF">*        auemp                           type z_auth_auemp,</font>
+<font color ="#0000FF">*        auedc                           type z_auth_auedc,</font>
+<font color ="#0000FF">*        aueda                           type z_auth_aueda,</font>
+<font color ="#0000FF">*        auqua                           type z_auth_auqua,</font>
+<font color ="#0000FF">*        auccr                           type z_auth_auccr,</font>
+<font color ="#0000FF">*      end of ty_wa_cvc.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    types:</font>
+<font color ="#0000FF">*      ty_v_auval                       type c length 20.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    types:</font>
+<font color ="#0000FF">*      begin of ty_wa_auth,</font>
+<font color ="#0000FF">*        brlid                      type z_auth_brlid,</font>
+<font color ="#0000FF">*        iarea                      type z_auth_iarea,</font>
+<font color ="#0000FF">*        funct                      type z_auth_funct,</font>
+<font color ="#0000FF">*        sfunc                      type z_auth_sfunc,</font>
+<font color ="#0000FF">*        t_auth                     type table of xuauth with non-unique key table_line,</font>
+<font color ="#0000FF">*        activity_group             type agr_name,</font>
+<font color ="#0000FF">*        act_profile_name           type xuprofname,</font>
+<font color ="#0000FF">*        t_external_template_data   type table of tvordata with non-unique key table_line,</font>
+<font color ="#0000FF">*      end of ty_wa_auth.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    class-methods:</font>
+<font color ="#0000FF">*      factory</font>
+<font color ="#0000FF">*        exporting</font>
+<font color ="#0000FF">*          er_lcl type ref to lcl.</font>
+
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      execute.</font>
+
+    class-methods:
+      maintain_analysis_auth.
+
+  private section.
+
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      t_auth_cvc                   type table of zzx_auth_aac.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      v_mtext                     type string.</font>
+
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      generate_cvcid.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      modify_analysis_auth.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_range</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iwa_auth_cvc type zzx_auth_aac</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_range) type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_range_org</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iv_auval type ty_v_auval</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_range) type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_range_psa</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iv_auval type ty_v_auval</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_range) type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_range_emp</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iv_auval type ty_v_auval</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_range) type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_range_edc</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iv_auval type ty_v_auval</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_range) type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_range_eda</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iv_auval type ty_v_auval</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_range) type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_range_qua</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iv_auval type ty_v_auval</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_range) type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_range_ccr</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iv_auval type ty_v_auval</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_range) type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_range_tc_actvt</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_range) type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_range_tc_valid</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_range) type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_hierarchy</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iwa_auth_cvc type zzx_auth_aac</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_hierarchy) type rsec_t_hierarchy_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_hierarchy_org</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iv_auval type ty_v_auval</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_hierarchy) type rsec_t_hierarchy_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_hierarchy_psa</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iv_auval type ty_v_auval</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_hierarchy) type rsec_t_hierarchy_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_hierarchy_qua</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iv_auval type ty_v_auval</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_hierarchy) type rsec_t_hierarchy_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_hierarchy_ccr</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iv_auval type ty_v_auval</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_hierarchy) type rsec_t_hierarchy_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_hierarchy_tc_iprov</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iv_iarea type z_auth_iarea</font>
+<font color ="#0000FF">*        returning</font>
+<font color ="#0000FF">*          value(rt_hierarchy) type rsec_t_hierarchy_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_node_and_type</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iv_auval type ty_v_auval</font>
+<font color ="#0000FF">*        exporting</font>
+<font color ="#0000FF">*          ev_node type rschavl</font>
+<font color ="#0000FF">*          ev_type type rssauthhiertype.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      add_auths_to_role.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      delete_role</font>
+<font color ="#0000FF">*        changing</font>
+<font color ="#0000FF">*          cwa_auth type ty_wa_auth.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      create_role</font>
+<font color ="#0000FF">*        changing</font>
+<font color ="#0000FF">*          cwa_auth type ty_wa_auth.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      get_auth_obj_values</font>
+<font color ="#0000FF">*        changing</font>
+<font color ="#0000FF">*          cwa_auth type ty_wa_auth.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      s_rs_comp</font>
+<font color ="#0000FF">*        importing</font>
+<font color ="#0000FF">*          iv_iarea type z_auth_iarea</font>
+<font color ="#0000FF">*        exporting</font>
+<font color ="#0000FF">*          et_ext type uje_t_tvordata</font>
+<font color ="#0000FF">*        changing</font>
+<font color ="#0000FF">*          cv_index type i.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      s_rs_comp1</font>
+<font color ="#0000FF">*        exporting</font>
+<font color ="#0000FF">*          et_ext type uje_t_tvordata</font>
+<font color ="#0000FF">*        changing</font>
+<font color ="#0000FF">*          cv_index type i.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      delete_profile</font>
+<font color ="#0000FF">*        changing</font>
+<font color ="#0000FF">*          cwa_auth type ty_wa_auth.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    methods:</font>
+<font color ="#0000FF">*      create_profile</font>
+<font color ="#0000FF">*        changing</font>
+<font color ="#0000FF">*          cwa_auth type ty_wa_auth.</font>
+
+endclass.                    "lcl DEFINITION
+
+initialization.
+
+  sscrfields-functxt_01 = '@XD@ Maintain Analysis Auth.'.
+  sscrfields-functxt_02 = '@06@ Go-to RSECADMIN.'.
+
+at selection-screen.
+
+  case sscrfields-ucomm.
+    when 'FC01'.
+      lcl=&gt;maintain_analysis_auth( ).
+    when 'FC02'.
+
+      call TRANSACTION 'RSECADMIN'.
+  endcase.
+
+start-of-selection.
+
+  data:
+    lcl                            type ref to lcl.
+
+  data:
+    lr_caar                        type ref to zcl_xot_create_aa_and_roles.
+
+  call method zcl_xot_create_aa_and_roles=&gt;factory
+    exporting
+      it_so_brlid = s_brlid[]
+      it_so_iarea = s_iarea[]
+      it_so_posit = s_posit[]
+      if_simul8   = p_simul8
+      if_gen8id   = p_gen8id
+      if_gen8aa   = p_gen8aa
+      if_gen8rl   = p_gen8rl
+    importing
+      er_caar     = lr_caar.
+
+  call method lr_caar-&gt;execute( ).
+
+<font color ="#0000FF">*  call method lcl=&gt;factory</font>
+<font color ="#0000FF">*    importing</font>
+<font color ="#0000FF">*      er_lcl = lcl.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  call method lcl-&gt;execute( ).</font>
+
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl IMPLEMENTATION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl implementation.
+
+<font color ="#0000FF">*  method factory.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    create object er_lcl.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "factory</font>
+
+<font color ="#0000FF">*  method execute.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Retrieve Characteristic Value Combinations (CVCs) for Analysis Authorisations.</font>
+<font color ="#0000FF">*    select *</font>
+<font color ="#0000FF">*      into table t_auth_cvc</font>
+<font color ="#0000FF">*      from zzx_auth_aac</font>
+<font color ="#0000FF">*      where</font>
+<font color ="#0000FF">*        brlid in s_brlid and</font>
+<font color ="#0000FF">*        iarea in s_iarea and</font>
+<font color ="#0000FF">*        posit in s_posit.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Generate a unique ID for each Characteristic Value Combination.</font>
+<font color ="#0000FF">*    generate_cvcid( ).</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Create or modify analysis authorisations based on the InfoArea and CVC.</font>
+<font color ="#0000FF">*    modify_analysis_auth( ).</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Create a SAP Technical Role with the Analysis Authorisations assigned.</font>
+<font color ="#0000FF">*    add_auths_to_role( ).</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "execute</font>
+<font color ="#0000FF">*</font>
+  method maintain_analysis_auth.
+
+    data:
+      lv_view_name                 type tabname.
+
+    lv_view_name = 'ZXVC_BWU_AUTH'.
+
+    "Open View Cluster.
+    call function 'VIEWCLUSTER_MAINTENANCE_CALL'
+      exporting
+        viewcluster_name             = lv_view_name
+        maintenance_action           = 'S'
+      exceptions
+        client_reference             = 1
+        foreign_lock                 = 2
+        viewcluster_not_found        = 3
+        viewcluster_is_inconsistent  = 4
+        missing_generated_function   = 5
+        no_upd_auth                  = 6
+        no_show_auth                 = 7
+        object_not_found             = 8
+        no_tvdir_entry               = 9
+        no_clientindep_auth          = 10
+        invalid_action               = 11
+        saving_correction_failed     = 12
+        system_failure               = 13
+        unknown_field_in_dba_sellist = 14
+        missing_corr_number          = 15
+        others                       = 16.
+
+  endmethod.                    "Maintain_Analysis_Auth
+
+<font color ="#0000FF">*  method generate_cvcid.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    types:</font>
+<font color ="#0000FF">*      begin of ty_wa_collision,</font>
+<font color ="#0000FF">*        cvcid                          type z_auth_cvcid,</font>
+<font color ="#0000FF">*        t_cvc                          type table of ty_wa_cvc with non-unique key table_line,</font>
+<font color ="#0000FF">*      end of ty_wa_collision.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lt_auth_cvc                      type table of zzx_auth_aac,</font>
+<font color ="#0000FF">*      lwa_cvc                          type ty_wa_cvc,</font>
+<font color ="#0000FF">*      lt_cvc                           type table of ty_wa_cvc,</font>
+<font color ="#0000FF">*      lv_cvcid                         type z_auth_cvcid,</font>
+<font color ="#0000FF">*      lwa_collision                    type ty_wa_collision,</font>
+<font color ="#0000FF">*      lt_collision                     type table of ty_wa_collision.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    field-symbols:</font>
+<font color ="#0000FF">*      &lt;lwa_auth_cvc&gt;               type zzx_auth_aac,</font>
+<font color ="#0000FF">*      &lt;lwa_collision&gt;              type ty_wa_collision.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_obj                       type string,</font>
+<font color ="#0000FF">*      lv_lsa                       type string.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_xml                       type string.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_data                       type string,</font>
+<font color ="#0000FF">*      lv_hashx                     type xstring.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    check p_gen8id = rs_c_true.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Process each CVC.</font>
+<font color ="#0000FF">*    loop at t_auth_cvc assigning &lt;lwa_auth_cvc&gt;.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Transfer the CVCs to the workarea.</font>
+<font color ="#0000FF">*      move-corresponding &lt;lwa_auth_cvc&gt; to lwa_cvc.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Append the workarea for the CVC to a table for serialisation.</font>
+<font color ="#0000FF">*      clear lt_cvc.</font>
+<font color ="#0000FF">*      append lwa_cvc to lt_cvc.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Serialise CVC as an XML string so that a hash digest can be created.</font>
+<font color ="#0000FF">*      call transformation id</font>
+<font color ="#0000FF">*        source tab = lt_cvc</font>
+<font color ="#0000FF">*        result xml lv_xml.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Generate digest, this will be the basis for the UID for the CVC.</font>
+<font color ="#0000FF">*      try.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*          call method cl_abap_message_digest=&gt;calculate_hash_for_char</font>
+<font color ="#0000FF">*            exporting</font>
+<font color ="#0000FF">*              if_data  = lv_xml</font>
+<font color ="#0000FF">*            importing</font>
+<font color ="#0000FF">*              ef_hashx = lv_hashx.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        catch cx_abap_message_digest .</font>
+<font color ="#0000FF">*      endtry.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Transfer X-String digest to character format to define the CVC alias.</font>
+<font color ="#0000FF">*      lv_cvcid = lv_hashx.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Update the CVC Id.</font>
+<font color ="#0000FF">*      &lt;lwa_auth_cvc&gt;-cvcid = lv_cvcid.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Collect CVC Id to CVC mapping.</font>
+<font color ="#0000FF">*      read table lt_collision assigning &lt;lwa_collision&gt;</font>
+<font color ="#0000FF">*        with key</font>
+<font color ="#0000FF">*          cvcid = lv_cvcid.</font>
+<font color ="#0000FF">*      if sy-subrc &lt;&gt; 0.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_collision-cvcid = lv_cvcid.</font>
+<font color ="#0000FF">*        append lwa_collision to lt_collision assigning &lt;lwa_collision&gt;.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      collect lwa_cvc into &lt;lwa_collision&gt;-t_cvc.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endloop.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Check collisions, each Alias should only be mapped to a single CVC.</font>
+<font color ="#0000FF">*    loop at lt_collision assigning &lt;lwa_collision&gt;.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      if lines( &lt;lwa_collision&gt;-t_cvc ) &gt; 1.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Raise collision error and exit.</font>
+<font color ="#0000FF">*        exit.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endloop.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Update the Id for each CVC.</font>
+<font color ="#0000FF">*    loop at t_auth_cvc assigning &lt;lwa_auth_cvc&gt;.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Derive function and sub function from InfoArea.</font>
+<font color ="#0000FF">*      split &lt;lwa_auth_cvc&gt;-iarea at `_` into lv_obj lv_lsa &lt;lwa_auth_cvc&gt;-funct &lt;lwa_auth_cvc&gt;-sfunc.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Derive Analysis Auth from function, sub function and unique ID.</font>
+<font color ="#0000FF">*      &lt;lwa_auth_cvc&gt;-aauth = |{ &lt;lwa_auth_cvc&gt;-funct }{ &lt;lwa_auth_cvc&gt;-sfunc }_{ &lt;lwa_auth_cvc&gt;-cvcid }|.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Update database table.</font>
+<font color ="#0000FF">*      update zzx_auth_aac</font>
+<font color ="#0000FF">*        set</font>
+<font color ="#0000FF">*          cvcid = &lt;lwa_auth_cvc&gt;-cvcid</font>
+<font color ="#0000FF">*          funct = &lt;lwa_auth_cvc&gt;-funct</font>
+<font color ="#0000FF">*          sfunc = &lt;lwa_auth_cvc&gt;-sfunc</font>
+<font color ="#0000FF">*          aauth = &lt;lwa_auth_cvc&gt;-aauth</font>
+<font color ="#0000FF">*        where</font>
+<font color ="#0000FF">*          brlid = &lt;lwa_auth_cvc&gt;-brlid and</font>
+<font color ="#0000FF">*          iarea = &lt;lwa_auth_cvc&gt;-iarea and</font>
+<font color ="#0000FF">*          posit = &lt;lwa_auth_cvc&gt;-posit.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endloop.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "generate_cvcid</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method modify_analysis_auth.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_auth                      type rsauth,</font>
+<font color ="#0000FF">*      lt_range                     type rsec_t_range_api,</font>
+<font color ="#0000FF">*      lt_hierarchy                 type rsec_t_hierarchy_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_short_text                type rstxtsh,</font>
+<font color ="#0000FF">*      lv_mid_text                  type rstxtmd,</font>
+<font color ="#0000FF">*      lv_long_text                 type rstxtlg.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_messages                 type bal_s_msg,</font>
+<font color ="#0000FF">*      lt_messages                  type rs_t_msg,</font>
+<font color ="#0000FF">*      lv_mtext                     type string.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    field-symbols:</font>
+<font color ="#0000FF">*      &lt;lwa_auth_cvc&gt;               type zzx_auth_aac.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    check p_gen8aa = rs_c_true.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Output message.</font>
+<font color ="#0000FF">*    skip.</font>
+<font color ="#0000FF">*    write: / 'GENERATE ANALYSIS AUTHORISATIONS:'.</font>
+<font color ="#0000FF">*    skip.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Process each CVC.</font>
+<font color ="#0000FF">*    loop at t_auth_cvc assigning &lt;lwa_auth_cvc&gt;.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Get the range selection for the Analysis Authorisation.</font>
+<font color ="#0000FF">*      lt_range = get_range( &lt;lwa_auth_cvc&gt; ).</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Get the hierarchy selection for the Analysis Authorisation.</font>
+<font color ="#0000FF">*      lt_hierarchy = get_hierarchy( &lt;lwa_auth_cvc&gt; ).</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "The Analysis Authorisation name is defirved by the prefix and CVC Id.</font>
+<font color ="#0000FF">*      lv_auth = |{ &lt;lwa_auth_cvc&gt;-funct }{ &lt;lwa_auth_cvc&gt;-sfunc }_{ &lt;lwa_auth_cvc&gt;-cvcid }|.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Set the short, medium and long text.</font>
+<font color ="#0000FF">*      lv_short_text = lv_auth.</font>
+<font color ="#0000FF">*      lv_mid_text = lv_auth.</font>
+<font color ="#0000FF">*      lv_long_text = lv_auth.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      if p_simul8 = rs_c_false.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Set the configuration for Analysis Auth.</font>
+<font color ="#0000FF">*        call function 'RSEC_MODIFY_AUTHORIZATION_API'</font>
+<font color ="#0000FF">*          exporting</font>
+<font color ="#0000FF">*            i_authname              = lv_auth</font>
+<font color ="#0000FF">*            i_t_range               = lt_range</font>
+<font color ="#0000FF">*            i_t_hierarchy           = lt_hierarchy</font>
+<font color ="#0000FF">*            i_short_text            = lv_short_text</font>
+<font color ="#0000FF">*            i_activate_auth         = 'X'</font>
+<font color ="#0000FF">*            i_mid_text              = lv_mid_text</font>
+<font color ="#0000FF">*            i_long_text             = lv_long_text</font>
+<font color ="#0000FF">*          importing</font>
+<font color ="#0000FF">*            e_t_messages            = lt_messages</font>
+<font color ="#0000FF">*          exceptions</font>
+<font color ="#0000FF">*            no_authorization        = 1</font>
+<font color ="#0000FF">*            forbidden_signs_in_name = 2</font>
+<font color ="#0000FF">*            wrong_name              = 3</font>
+<font color ="#0000FF">*            authorization_is_empty  = 4</font>
+<font color ="#0000FF">*            empty_short_text        = 5</font>
+<font color ="#0000FF">*            no_change_auth          = 6</font>
+<font color ="#0000FF">*            no_create_auth          = 7</font>
+<font color ="#0000FF">*            auth_locked             = 8</font>
+<font color ="#0000FF">*            others                  = 9.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Output messages.</font>
+<font color ="#0000FF">*        loop at lt_messages into lwa_messages.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*          "Output message.</font>
+<font color ="#0000FF">*          message</font>
+<font color ="#0000FF">*            id lwa_messages-msgid</font>
+<font color ="#0000FF">*            type lwa_messages-msgty</font>
+<font color ="#0000FF">*            number lwa_messages-msgno</font>
+<font color ="#0000FF">*            with</font>
+<font color ="#0000FF">*               lwa_messages-msgv1</font>
+<font color ="#0000FF">*               lwa_messages-msgv2</font>
+<font color ="#0000FF">*               lwa_messages-msgv3</font>
+<font color ="#0000FF">*               lwa_messages-msgv4</font>
+<font color ="#0000FF">*            into lv_mtext.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*          write: / lv_mtext.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        endloop.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      else.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Output simulation message.</font>
+<font color ="#0000FF">*        lv_mtext = |Authorization '{ lv_auth }' saved.|.</font>
+<font color ="#0000FF">*        write: / lv_mtext.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endloop.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "modify_analysis_auth</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_range.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lines of get_range_org( iwa_auth_cvc-auorg ) to rt_range.</font>
+<font color ="#0000FF">*    append lines of get_range_psa( iwa_auth_cvc-aupsa ) to rt_range.</font>
+<font color ="#0000FF">*    append lines of get_range_emp( iwa_auth_cvc-auemp ) to rt_range.</font>
+<font color ="#0000FF">*    append lines of get_range_edc( iwa_auth_cvc-auedc ) to rt_range.</font>
+<font color ="#0000FF">*    append lines of get_range_eda( iwa_auth_cvc-aueda ) to rt_range.</font>
+<font color ="#0000FF">*    append lines of get_range_qua( iwa_auth_cvc-auqua ) to rt_range.</font>
+<font color ="#0000FF">*    append lines of get_range_ccr( iwa_auth_cvc-auccr ) to rt_range.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Get technical characteristics.</font>
+<font color ="#0000FF">*    append lines of get_range_tc_actvt( ) to rt_range.</font>
+<font color ="#0000FF">*    append lines of get_range_tc_valid( ) to rt_range.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_range</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_range_org.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_range                    type rsec_s_auth_values_range,</font>
+<font color ="#0000FF">*      lt_range                     type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Hierarchy selections are denoted with a '+' prefix.</font>
+<font color ="#0000FF">*    check iv_auval(1) &lt;&gt; '+'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    lwa_range-iobjnm = 'ORG_SEC'.</font>
+<font color ="#0000FF">*    lwa_range-sign = 'I'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    case iv_auval.</font>
+<font color ="#0000FF">*      when '-'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        return.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when '*'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'CP'.</font>
+<font color ="#0000FF">*        lwa_range-low  = '*'.</font>
+<font color ="#0000FF">*        lwa_range-high = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when ':'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'EQ'.</font>
+<font color ="#0000FF">*        lwa_range-low  = ':'.</font>
+<font color ="#0000FF">*        lwa_range-high = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when others.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'EQ'.</font>
+<font color ="#0000FF">*        lwa_range-low  = iv_auval.</font>
+<font color ="#0000FF">*        lwa_range-high = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endcase.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lwa_range to lt_range.</font>
+<font color ="#0000FF">*    rt_range = lt_range.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_range_org</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_range_psa.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_range                    type rsec_s_auth_values_range,</font>
+<font color ="#0000FF">*      lt_range                     type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Hierarchy selections are denoted with a '+' prefix.</font>
+<font color ="#0000FF">*    check iv_auval(1) &lt;&gt; '+'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    lwa_range-iobjnm = 'AU_PERSAR'.</font>
+<font color ="#0000FF">*    lwa_range-sign = 'I'.</font>
+<font color ="#0000FF">*    lwa_range-high = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    case iv_auval.</font>
+<font color ="#0000FF">*      when '-'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        return.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when '*'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'CP'.</font>
+<font color ="#0000FF">*        lwa_range-low  = '*'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when ':'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'EQ'.</font>
+<font color ="#0000FF">*        lwa_range-low  = ':'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when others.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'EQ'.</font>
+<font color ="#0000FF">*        lwa_range-low  = iv_auval.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endcase.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lwa_range to lt_range.</font>
+<font color ="#0000FF">*    rt_range = lt_range.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_range_psa</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_range_emp.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_range                    type rsec_s_auth_values_range,</font>
+<font color ="#0000FF">*      lt_range                     type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Hierarchy selections are denoted with a '+' prefix.</font>
+<font color ="#0000FF">*    check iv_auval(1) &lt;&gt; '+'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    lwa_range-iobjnm = '0EMPLOYEE'.</font>
+<font color ="#0000FF">*    lwa_range-sign = 'I'.</font>
+<font color ="#0000FF">*    lwa_range-high = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    case iv_auval.</font>
+<font color ="#0000FF">*      when '-'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        return.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when '*'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'CP'.</font>
+<font color ="#0000FF">*        lwa_range-low  = '*'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when ':'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'EQ'.</font>
+<font color ="#0000FF">*        lwa_range-low  = ':'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when others.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'EQ'.</font>
+<font color ="#0000FF">*        lwa_range-low  = iv_auval.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endcase.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lwa_range to lt_range.</font>
+<font color ="#0000FF">*    rt_range = lt_range.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_range_emp</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_range_edc.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_range                    type rsec_s_auth_values_range,</font>
+<font color ="#0000FF">*      lt_range                     type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Hierarchy selections are denoted with a '+' prefix.</font>
+<font color ="#0000FF">*    check iv_auval(1) &lt;&gt; '+'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    case iv_auval.</font>
+<font color ="#0000FF">*      when '-'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        return.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when '*'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'CP'.</font>
+<font color ="#0000FF">*        lwa_range-low  = '*'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when ':'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'EQ'.</font>
+<font color ="#0000FF">*        lwa_range-low  = ':'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when others.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'EQ'.</font>
+<font color ="#0000FF">*        lwa_range-low  = iv_auval.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endcase.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    lwa_range-sign = 'I'.</font>
+<font color ="#0000FF">*    lwa_range-high = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    do 7 times.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      case sy-index.</font>
+<font color ="#0000FF">*        when 1.</font>
+<font color ="#0000FF">*          lwa_range-iobjnm = '0DATEBIRTH'.</font>
+<font color ="#0000FF">*        when 2.</font>
+<font color ="#0000FF">*          lwa_range-iobjnm = '0GENDER'.</font>
+<font color ="#0000FF">*        when 3.</font>
+<font color ="#0000FF">*          lwa_range-iobjnm = 'ZCABORG'.</font>
+<font color ="#0000FF">*        when 4.</font>
+<font color ="#0000FF">*          lwa_range-iobjnm = 'ZCREFUGEE'.</font>
+<font color ="#0000FF">*        when 5.</font>
+<font color ="#0000FF">*          lwa_range-iobjnm = 'ZC_DISABL'.</font>
+<font color ="#0000FF">*        when 6.</font>
+<font color ="#0000FF">*          lwa_range-iobjnm = 'ZC_FSLANG'.</font>
+<font color ="#0000FF">*        when 7.</font>
+<font color ="#0000FF">*          lwa_range-iobjnm = 'ZC_SRVYD'.</font>
+<font color ="#0000FF">*      endcase.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      append lwa_range to lt_range.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    enddo.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    rt_range = lt_range.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_range_edc</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_range_eda.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_range                    type rsec_s_auth_values_range,</font>
+<font color ="#0000FF">*      lt_range                     type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Hierarchy selections are denoted with a '+' prefix.</font>
+<font color ="#0000FF">*    check iv_auval(1) &lt;&gt; '+'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    case iv_auval.</font>
+<font color ="#0000FF">*      when '-'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        return.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when '*'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'CP'.</font>
+<font color ="#0000FF">*        lwa_range-low  = '*'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when ':'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'EQ'.</font>
+<font color ="#0000FF">*        lwa_range-low  = ':'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when others.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'EQ'.</font>
+<font color ="#0000FF">*        lwa_range-low  = iv_auval.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endcase.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    lwa_range-sign = 'I'.</font>
+<font color ="#0000FF">*    lwa_range-high = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    do 7 times.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      case sy-index.</font>
+<font color ="#0000FF">*        when 1.</font>
+<font color ="#0000FF">*          lwa_range-iobjnm = '0EMPLOYEE__0DATEBIRTH'.</font>
+<font color ="#0000FF">*        when 2.</font>
+<font color ="#0000FF">*          lwa_range-iobjnm = '0EMPLOYEE__0GENDER'.</font>
+<font color ="#0000FF">*        when 3.</font>
+<font color ="#0000FF">*          lwa_range-iobjnm = '0EMPLOYEE__ZCABORG'.</font>
+<font color ="#0000FF">*        when 4.</font>
+<font color ="#0000FF">*          lwa_range-iobjnm = '0EMPLOYEE__ZCREFUGEE'.</font>
+<font color ="#0000FF">*        when 5.</font>
+<font color ="#0000FF">*          lwa_range-iobjnm = '0EMPLOYEE__ZC_DISABL'.</font>
+<font color ="#0000FF">*        when 6.</font>
+<font color ="#0000FF">*          lwa_range-iobjnm = '0EMPLOYEE__ZC_FSLANG'.</font>
+<font color ="#0000FF">*        when 7.</font>
+<font color ="#0000FF">*          lwa_range-iobjnm = '0EMPLOYEE__ZC_SRVYD'.</font>
+<font color ="#0000FF">*      endcase.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      append lwa_range to lt_range.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    enddo.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    rt_range = lt_range.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_range_eda</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_range_qua.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_range                    type rsec_s_auth_values_range,</font>
+<font color ="#0000FF">*      lt_range                     type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Hierarchy selections are denoted with a '+' prefix.</font>
+<font color ="#0000FF">*    check iv_auval(1) &lt;&gt; '+'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    lwa_range-iobjnm = 'ZAUTHQUAL'.</font>
+<font color ="#0000FF">*    lwa_range-sign = 'I'.</font>
+<font color ="#0000FF">*    lwa_range-high = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    case iv_auval.</font>
+<font color ="#0000FF">*      when '-'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        return.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when '*'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'CP'.</font>
+<font color ="#0000FF">*        lwa_range-low  = '*'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when ':'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'EQ'.</font>
+<font color ="#0000FF">*        lwa_range-low  = ':'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when others.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'EQ'.</font>
+<font color ="#0000FF">*        lwa_range-low  = iv_auval.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endcase.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lwa_range to lt_range.</font>
+<font color ="#0000FF">*    rt_range = lt_range.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_range_qua</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_range_ccr.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_range                    type rsec_s_auth_values_range,</font>
+<font color ="#0000FF">*      lt_range                     type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Hierarchy selections are denoted with a '+' prefix.</font>
+<font color ="#0000FF">*    check iv_auval(1) &lt;&gt; '+'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    lwa_range-iobjnm = 'COCTR_SEC'.</font>
+<font color ="#0000FF">*    lwa_range-sign = 'I'.</font>
+<font color ="#0000FF">*    lwa_range-high = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    case iv_auval.</font>
+<font color ="#0000FF">*      when '-'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        return.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when '*'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'CP'.</font>
+<font color ="#0000FF">*        lwa_range-low  = '*'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when ':'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'EQ'.</font>
+<font color ="#0000FF">*        lwa_range-low  = ':'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when others.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_range-opt  = 'EQ'.</font>
+<font color ="#0000FF">*        lwa_range-low  = iv_auval.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endcase.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lwa_range to lt_range.</font>
+<font color ="#0000FF">*    rt_range = lt_range.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_range_ccr</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_range_tc_actvt.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_range                    type rsec_s_auth_values_range,</font>
+<font color ="#0000FF">*      lt_range                     type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    lwa_range-iobjnm = '0TCAACTVT'.</font>
+<font color ="#0000FF">*    lwa_range-sign   = 'I'.</font>
+<font color ="#0000FF">*    lwa_range-opt    = 'EQ'.</font>
+<font color ="#0000FF">*    lwa_range-low    = '03'.</font>
+<font color ="#0000FF">*    lwa_range-high   = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lwa_range to lt_range.</font>
+<font color ="#0000FF">*    rt_range = lt_range.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_range_tc_actvt</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_range_tc_valid.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_range                    type rsec_s_auth_values_range,</font>
+<font color ="#0000FF">*      lt_range                     type rsec_t_range_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    lwa_range-iobjnm = '0TCAVALID'.</font>
+<font color ="#0000FF">*    lwa_range-sign   = 'I'.</font>
+<font color ="#0000FF">*    lwa_range-opt    = 'CP'.</font>
+<font color ="#0000FF">*    lwa_range-low    = '*'.</font>
+<font color ="#0000FF">*    lwa_range-high   = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lwa_range to lt_range.</font>
+<font color ="#0000FF">*    rt_range = lt_range.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_range_tc_valid</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_hierarchy.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lines of get_hierarchy_org( iwa_auth_cvc-auorg ) to rt_hierarchy.</font>
+<font color ="#0000FF">*    append lines of get_hierarchy_psa( iwa_auth_cvc-aupsa ) to rt_hierarchy.</font>
+<font color ="#0000FF">*    append lines of get_hierarchy_qua( iwa_auth_cvc-auqua ) to rt_hierarchy.</font>
+<font color ="#0000FF">*    append lines of get_hierarchy_ccr( iwa_auth_cvc-auccr ) to rt_hierarchy.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Get technical characteristics.</font>
+<font color ="#0000FF">*    append lines of get_hierarchy_tc_iprov( iwa_auth_cvc-iarea ) to rt_hierarchy.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_hierarchy</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_hierarchy_org.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_hierarchy                type rsec_s_auth_values_hierarchy,</font>
+<font color ="#0000FF">*      lt_hierarchy                 type rsec_t_hierarchy_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_node                      type rschavl,</font>
+<font color ="#0000FF">*      lv_type                      type rssauthhiertype.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Hierarchy selections are denoted with a '+' prefix.</font>
+<font color ="#0000FF">*    check iv_auval(1) = '+'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set the fixed values.</font>
+<font color ="#0000FF">*    lwa_hierarchy-iobjnm   = 'ORG_SEC'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-hienm    = 'ORGEH'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-version  = '000'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-dateto   = '99991231'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-niobjnm  = '0ORGUNIT'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-compmode = ''.</font>
+<font color ="#0000FF">*    lwa_hierarchy-tlevel   = ''.</font>
+<font color ="#0000FF">*    lwa_hierarchy-hdate    = sy-datum.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Derive the node and authorisation type in the selection.</font>
+<font color ="#0000FF">*    call method get_node_and_type</font>
+<font color ="#0000FF">*      exporting</font>
+<font color ="#0000FF">*        iv_auval = iv_auval</font>
+<font color ="#0000FF">*      importing</font>
+<font color ="#0000FF">*        ev_node  = lv_node</font>
+<font color ="#0000FF">*        ev_type  = lv_type.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set the hierarchy node selection type.</font>
+<font color ="#0000FF">*    lwa_hierarchy-authtype = lv_type.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set the hierarchy node selection.</font>
+<font color ="#0000FF">*    case lv_node.</font>
+<font color ="#0000FF">*      when 'BCC'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_hierarchy-node = '10000585'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when others.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_hierarchy-node = lv_node.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endcase.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lwa_hierarchy to lt_hierarchy.</font>
+<font color ="#0000FF">*    rt_hierarchy = lt_hierarchy.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_hierarchy_org</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_hierarchy_psa.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_hierarchy                type rsec_s_auth_values_hierarchy,</font>
+<font color ="#0000FF">*      lt_hierarchy                 type rsec_t_hierarchy_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_node                      type rschavl,</font>
+<font color ="#0000FF">*      lv_type                      type rssauthhiertype.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Hierarchy selections are denoted with a '+' prefix.</font>
+<font color ="#0000FF">*    check iv_auval(1) = '+'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set the fixed values.</font>
+<font color ="#0000FF">*    lwa_hierarchy-iobjnm   = 'AU_PERSAR'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-hienm    = '0PERS_SAREA'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-version  = ''.</font>
+<font color ="#0000FF">*    lwa_hierarchy-dateto   = '99991231'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-niobjnm  = '0HIER_NODE'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-compmode = ''.</font>
+<font color ="#0000FF">*    lwa_hierarchy-tlevel   = ''.</font>
+<font color ="#0000FF">*    lwa_hierarchy-hdate    = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Derive the node and authorisation type in the selection.</font>
+<font color ="#0000FF">*    call method get_node_and_type</font>
+<font color ="#0000FF">*      exporting</font>
+<font color ="#0000FF">*        iv_auval = iv_auval</font>
+<font color ="#0000FF">*      importing</font>
+<font color ="#0000FF">*        ev_node  = lv_node</font>
+<font color ="#0000FF">*        ev_type  = lv_type.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set the hierarchy node selection type.</font>
+<font color ="#0000FF">*    lwa_hierarchy-authtype = lv_type.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set the hierarchy node selection.</font>
+<font color ="#0000FF">*    case lv_node.</font>
+<font color ="#0000FF">*      when 'NEX'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_hierarchy-node = 'NEX'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when 'EXEC'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_hierarchy-node = 'EXEC'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when 'CASO'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_hierarchy-node = 'CASO'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when others.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_hierarchy-node = lv_node.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endcase.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lwa_hierarchy to lt_hierarchy.</font>
+<font color ="#0000FF">*    rt_hierarchy = lt_hierarchy.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_hierarchy_psa</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_hierarchy_qua.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_hierarchy                type rsec_s_auth_values_hierarchy,</font>
+<font color ="#0000FF">*      lt_hierarchy                 type rsec_t_hierarchy_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_node                      type rschavl,</font>
+<font color ="#0000FF">*      lv_type                      type rssauthhiertype.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Hierarchy selections are denoted with a '+' prefix.</font>
+<font color ="#0000FF">*    check iv_auval(1) = '+'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set the fixed values.</font>
+<font color ="#0000FF">*    lwa_hierarchy-iobjnm   = 'ZAUTHQUAL'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-hienm    = 'QUALCATA'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-version  = '000'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-dateto   = '99991231'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-niobjnm  = '0QUALIGROUP'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-compmode = ''.</font>
+<font color ="#0000FF">*    lwa_hierarchy-tlevel   = ''.</font>
+<font color ="#0000FF">*    lwa_hierarchy-hdate    = sy-datum.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Derive the node and authorisation type in the selection.</font>
+<font color ="#0000FF">*    call method get_node_and_type</font>
+<font color ="#0000FF">*      exporting</font>
+<font color ="#0000FF">*        iv_auval = iv_auval</font>
+<font color ="#0000FF">*      importing</font>
+<font color ="#0000FF">*        ev_node  = lv_node</font>
+<font color ="#0000FF">*        ev_type  = lv_type.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set the hierarchy node selection type.</font>
+<font color ="#0000FF">*    lwa_hierarchy-authtype = lv_type.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set the hierarchy node selection.</font>
+<font color ="#0000FF">*    case lv_node.</font>
+<font color ="#0000FF">*      when 'NLBC'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_hierarchy-node = '10000025'.</font>
+<font color ="#0000FF">*        append lwa_hierarchy to lt_hierarchy.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_hierarchy-node = '10000175'.</font>
+<font color ="#0000FF">*        append lwa_hierarchy to lt_hierarchy.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_hierarchy-node = '10000276'.</font>
+<font color ="#0000FF">*        append lwa_hierarchy to lt_hierarchy.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when 'LBC'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_hierarchy-node = '10000025'.</font>
+<font color ="#0000FF">*        append lwa_hierarchy to lt_hierarchy.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_hierarchy-node = '10000175'.</font>
+<font color ="#0000FF">*        append lwa_hierarchy to lt_hierarchy.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_hierarchy-node = '10000250'.</font>
+<font color ="#0000FF">*        append lwa_hierarchy to lt_hierarchy.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when others.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_hierarchy-node = lv_node.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endcase.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lwa_hierarchy to lt_hierarchy.</font>
+<font color ="#0000FF">*    rt_hierarchy = lt_hierarchy.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_hierarchy_qua</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_hierarchy_ccr.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_hierarchy                type rsec_s_auth_values_hierarchy,</font>
+<font color ="#0000FF">*      lt_hierarchy                 type rsec_t_hierarchy_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_node                      type rschavl,</font>
+<font color ="#0000FF">*      lv_type                      type rssauthhiertype.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Hierarchy selections are denoted with a '+' prefix.</font>
+<font color ="#0000FF">*    check iv_auval(1) = '+'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set the fixed values.</font>
+<font color ="#0000FF">*    lwa_hierarchy-iobjnm   = 'COCTR_SEC'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-hienm    = '40004000'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-version  = ''.</font>
+<font color ="#0000FF">*    lwa_hierarchy-dateto   = '99991231'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-niobjnm  = '0HIER_NODE'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-compmode = ''.</font>
+<font color ="#0000FF">*    lwa_hierarchy-tlevel   = ''.</font>
+<font color ="#0000FF">*    lwa_hierarchy-hdate    = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Derive the node and authorisation type in the selection.</font>
+<font color ="#0000FF">*    call method get_node_and_type</font>
+<font color ="#0000FF">*      exporting</font>
+<font color ="#0000FF">*        iv_auval = iv_auval</font>
+<font color ="#0000FF">*      importing</font>
+<font color ="#0000FF">*        ev_node  = lv_node</font>
+<font color ="#0000FF">*        ev_type  = lv_type.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set the hierarchy node selection type.</font>
+<font color ="#0000FF">*    lwa_hierarchy-authtype = lv_type.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set the hierarchy node selection.</font>
+<font color ="#0000FF">*    case lv_node.</font>
+<font color ="#0000FF">*      when 'BCC'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_hierarchy-node = '00000000000000000000000040004000'.</font>
+<font color ="#0000FF">*        append lwa_hierarchy to lt_hierarchy.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      when others.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        lwa_hierarchy-node = lv_node.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endcase.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lwa_hierarchy to lt_hierarchy.</font>
+<font color ="#0000FF">*    rt_hierarchy = lt_hierarchy.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_hierarchy_ccr</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_hierarchy_tc_iprov.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_hierarchy                type rsec_s_auth_values_hierarchy,</font>
+<font color ="#0000FF">*      lt_hierarchy                 type rsec_t_hierarchy_api.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_node                      type rschavl,</font>
+<font color ="#0000FF">*      lv_type                      type rssauthhiertype.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set the fixed values.</font>
+<font color ="#0000FF">*    lwa_hierarchy-iobjnm   = '0TCAIPROV'."'0INFOPROV'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-hienm    = 'INFOAREAHIER'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-version  = ''.</font>
+<font color ="#0000FF">*    lwa_hierarchy-dateto   = '99991231'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-niobjnm  = '0TCAIFAREA'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-node     = iv_iarea.</font>
+<font color ="#0000FF">*    lwa_hierarchy-authtype = '1'.</font>
+<font color ="#0000FF">*    lwa_hierarchy-compmode = ''.</font>
+<font color ="#0000FF">*    lwa_hierarchy-tlevel   = ''.</font>
+<font color ="#0000FF">*    lwa_hierarchy-hdate    = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lwa_hierarchy to lt_hierarchy.</font>
+<font color ="#0000FF">*    rt_hierarchy = lt_hierarchy.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_hierarchy_tc_iprov</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_node_and_type.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_result                   type match_result,</font>
+<font color ="#0000FF">*      lt_results                   type match_result_tab,</font>
+<font color ="#0000FF">*      lwa_sub_result               type submatch_result,</font>
+<font color ="#0000FF">*      lt_sub_result                type submatch_result_tab,</font>
+<font color ="#0000FF">*      lv_match                     type rs_bool.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    find regex '(\+)(.*)(\()(.*)(\))' in iv_auval results lt_results.</font>
+<font color ="#0000FF">*    if sy-subrc = 0.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Retrieve the hierarchy detail.</font>
+<font color ="#0000FF">*      read table lt_results into lwa_result index 1.</font>
+<font color ="#0000FF">*      if sy-subrc = 0.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Retrieve the hierarchy node selection.</font>
+<font color ="#0000FF">*        read table lwa_result-submatches into lwa_sub_result index 2.</font>
+<font color ="#0000FF">*        if sy-subrc = 0.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*          "Set the hierarchy node selection.</font>
+<font color ="#0000FF">*          ev_node = iv_auval+lwa_sub_result-offset(lwa_sub_result-length).</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Retrieve the hierarchy authorisation type.</font>
+<font color ="#0000FF">*        read table lwa_result-submatches into lwa_sub_result index 4.</font>
+<font color ="#0000FF">*        if sy-subrc = 0.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*          "Set the hierarchy authorisation type.</font>
+<font color ="#0000FF">*          ev_type = iv_auval+lwa_sub_result-offset(lwa_sub_result-length).</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_node_and_type</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method add_auths_to_role.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_auth                      type xuauth,</font>
+<font color ="#0000FF">*      lwa_auth                     type ty_wa_auth,</font>
+<font color ="#0000FF">*      lt_auth                      type table of ty_wa_auth.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_obj                       type string,</font>
+<font color ="#0000FF">*      lv_lsa                       type string.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    field-symbols:</font>
+<font color ="#0000FF">*      &lt;lwa_auth_cvc&gt;               type zzx_auth_aac,</font>
+<font color ="#0000FF">*      &lt;lwa_auth&gt;                   type ty_wa_auth.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    check p_gen8rl = rs_c_true.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Output message.</font>
+<font color ="#0000FF">*    skip.</font>
+<font color ="#0000FF">*    write: / 'ADD ANALYSIS AUTHORISATIONS TO ROLES:'.</font>
+<font color ="#0000FF">*    skip.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Process each line and group by Business Role.</font>
+<font color ="#0000FF">*    loop at t_auth_cvc assigning &lt;lwa_auth_cvc&gt;.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      read table lt_auth assigning &lt;lwa_auth&gt;</font>
+<font color ="#0000FF">*        with key</font>
+<font color ="#0000FF">*          brlid = &lt;lwa_auth_cvc&gt;-brlid</font>
+<font color ="#0000FF">*          iarea = &lt;lwa_auth_cvc&gt;-iarea.</font>
+<font color ="#0000FF">*      if sy-subrc &lt;&gt; 0.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Set the Business Rule Id.</font>
+<font color ="#0000FF">*        lwa_auth-brlid = &lt;lwa_auth_cvc&gt;-brlid.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Set the InfoArea.</font>
+<font color ="#0000FF">*        lwa_auth-iarea = &lt;lwa_auth_cvc&gt;-iarea.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Set the Function.</font>
+<font color ="#0000FF">*        lwa_auth-funct = &lt;lwa_auth_cvc&gt;-funct.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Set the Sub-function.</font>
+<font color ="#0000FF">*        lwa_auth-sfunc = &lt;lwa_auth_cvc&gt;-sfunc.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Create a line for the Business Role.</font>
+<font color ="#0000FF">*        append lwa_auth to lt_auth assigning &lt;lwa_auth&gt;.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Derive the Analysis Authorisation name.</font>
+<font color ="#0000FF">*      lv_auth = |{ &lt;lwa_auth_cvc&gt;-funct }{ &lt;lwa_auth_cvc&gt;-sfunc }_{ &lt;lwa_auth_cvc&gt;-cvcid }|.</font>
+<font color ="#0000FF">*      append lv_auth to &lt;lwa_auth&gt;-t_auth.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endloop.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    loop at lt_auth assigning &lt;lwa_auth&gt;.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Derive role name.</font>
+<font color ="#0000FF">*      &lt;lwa_auth&gt;-activity_group = |ZBI20.{ &lt;lwa_auth&gt;-funct }.{ &lt;lwa_auth&gt;-sfunc }:{ substring( val = &lt;lwa_auth&gt;-brlid off = 2 ) }|.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Delete role if it exists.</font>
+<font color ="#0000FF">*      delete_role( changing cwa_auth = &lt;lwa_auth&gt; ).</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Create role if it exists.</font>
+<font color ="#0000FF">*      create_role( changing cwa_auth = &lt;lwa_auth&gt; ).</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Get authorisation object values.</font>
+<font color ="#0000FF">*      get_auth_obj_values( changing cwa_auth = &lt;lwa_auth&gt; ).</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Delete generated profile.</font>
+<font color ="#0000FF">*      delete_profile( changing cwa_auth = &lt;lwa_auth&gt; ).</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Create the profile.</font>
+<font color ="#0000FF">*      create_profile( changing cwa_auth = &lt;lwa_auth&gt;  ).</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      write: / ''. skip.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endloop.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "create_role</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method s_rs_comp.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_external_template_data   type tvordata,</font>
+<font color ="#0000FF">*      lt_external_template_data    type table of tvordata.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    lwa_external_template_data-object   = 'S_RS_COMP'.</font>
+<font color ="#0000FF">*    lwa_external_template_data-modifier = sy-uname.</font>
+<font color ="#0000FF">*    lwa_external_template_data-moddate  = sy-datum.</font>
+<font color ="#0000FF">*    lwa_external_template_data-modtime  = sy-uzeit.</font>
+<font color ="#0000FF">*    lwa_external_template_data-high     = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    add 1 to cv_index.</font>
+<font color ="#0000FF">*    "lwa_external_template_data-lfdnr    = cv_index.</font>
+<font color ="#0000FF">*    lwa_external_template_data-field    = 'ACTVT'.</font>
+<font color ="#0000FF">*    lwa_external_template_data-low      = '03'.</font>
+<font color ="#0000FF">*    append lwa_external_template_data to lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    add 1 to cv_index.</font>
+<font color ="#0000FF">*    "lwa_external_template_data-lfdnr    = cv_index.</font>
+<font color ="#0000FF">*    lwa_external_template_data-field    = 'ACTVT'.</font>
+<font color ="#0000FF">*    lwa_external_template_data-low      = '16'.</font>
+<font color ="#0000FF">*    append lwa_external_template_data to lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    add 1 to cv_index.</font>
+<font color ="#0000FF">*    "lwa_external_template_data-lfdnr    = cv_index.</font>
+<font color ="#0000FF">*    lwa_external_template_data-field    = 'RSINFOAREA'.</font>
+<font color ="#0000FF">*    lwa_external_template_data-low      = iv_iarea.</font>
+<font color ="#0000FF">*    append lwa_external_template_data to lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    add 1 to cv_index.</font>
+<font color ="#0000FF">*    "lwa_external_template_data-lfdnr    = cv_index.</font>
+<font color ="#0000FF">*    lwa_external_template_data-field    = 'RSINFOCUBE'.</font>
+<font color ="#0000FF">*    lwa_external_template_data-low      = '*'.</font>
+<font color ="#0000FF">*    append lwa_external_template_data to lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    add 1 to cv_index.</font>
+<font color ="#0000FF">*    "lwa_external_template_data-lfdnr    = cv_index.</font>
+<font color ="#0000FF">*    lwa_external_template_data-field    = 'RSZCOMPID'.</font>
+<font color ="#0000FF">*    lwa_external_template_data-low      = 'Z*'.</font>
+<font color ="#0000FF">*    append lwa_external_template_data to lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    add 1 to cv_index.</font>
+<font color ="#0000FF">*    "lwa_external_template_data-lfdnr    = cv_index.</font>
+<font color ="#0000FF">*    lwa_external_template_data-field    = 'RSZCOMPTP'.</font>
+<font color ="#0000FF">*    lwa_external_template_data-low      = 'REP'.</font>
+<font color ="#0000FF">*    append lwa_external_template_data to lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    et_ext = lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "s_rs_comp</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method s_rs_comp1.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_external_template_data   type tvordata,</font>
+<font color ="#0000FF">*      lt_external_template_data    type table of tvordata.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    lwa_external_template_data-object   = 'S_RS_COMP1'.</font>
+<font color ="#0000FF">*    lwa_external_template_data-modifier = sy-uname.</font>
+<font color ="#0000FF">*    lwa_external_template_data-moddate  = sy-datum.</font>
+<font color ="#0000FF">*    lwa_external_template_data-modtime  = sy-uzeit.</font>
+<font color ="#0000FF">*    lwa_external_template_data-high     = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    add 1 to cv_index.</font>
+<font color ="#0000FF">*    "lwa_external_template_data-lfdnr    = cv_index.</font>
+<font color ="#0000FF">*    lwa_external_template_data-field    = 'ACTVT'.</font>
+<font color ="#0000FF">*    lwa_external_template_data-low      = '03'.</font>
+<font color ="#0000FF">*    append lwa_external_template_data to lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    add 1 to cv_index.</font>
+<font color ="#0000FF">*    "lwa_external_template_data-lfdnr    = cv_index.</font>
+<font color ="#0000FF">*    lwa_external_template_data-field    = 'ACTVT'.</font>
+<font color ="#0000FF">*    lwa_external_template_data-low      = '16'.</font>
+<font color ="#0000FF">*    append lwa_external_template_data to lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    add 1 to cv_index.</font>
+<font color ="#0000FF">*    "lwa_external_template_data-lfdnr    = cv_index.</font>
+<font color ="#0000FF">*    lwa_external_template_data-field    = 'RSZCOMPID'.</font>
+<font color ="#0000FF">*    lwa_external_template_data-low      = '*'.</font>
+<font color ="#0000FF">*    append lwa_external_template_data to lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    add 1 to cv_index.</font>
+<font color ="#0000FF">*    "lwa_external_template_data-lfdnr    = cv_index.</font>
+<font color ="#0000FF">*    lwa_external_template_data-field    = 'RSZCOMPTP'.</font>
+<font color ="#0000FF">*    lwa_external_template_data-low      = 'REP'.</font>
+<font color ="#0000FF">*    append lwa_external_template_data to lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    add 1 to cv_index.</font>
+<font color ="#0000FF">*    "lwa_external_template_data-lfdnr    = cv_index.</font>
+<font color ="#0000FF">*    lwa_external_template_data-field    = 'RSZOWNER'.</font>
+<font color ="#0000FF">*    lwa_external_template_data-low      = '*'.</font>
+<font color ="#0000FF">*    append lwa_external_template_data to lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    et_ext = lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "s_rs_comp1</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method delete_role.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Check if the role already exists.</font>
+<font color ="#0000FF">*    call function 'PRGN_CHECK_AGR_EXISTS'</font>
+<font color ="#0000FF">*      exporting</font>
+<font color ="#0000FF">*        activity_group                = cwa_auth-activity_group</font>
+<font color ="#0000FF">*      exceptions</font>
+<font color ="#0000FF">*        activity_group_does_not_exist = 1</font>
+<font color ="#0000FF">*        others                        = 2.</font>
+<font color ="#0000FF">*    if sy-subrc = 0.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      if p_simul8 = rs_c_true.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Output message.</font>
+<font color ="#0000FF">*        v_mtext = |Role '{ cwa_auth-activity_group }' deleted.|.</font>
+<font color ="#0000FF">*        write: / v_mtext.</font>
+<font color ="#0000FF">*        return.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Delete the role if it exists.</font>
+<font color ="#0000FF">*      call function 'PRGN_ACTIVITY_GROUP_DELETE'</font>
+<font color ="#0000FF">*        exporting</font>
+<font color ="#0000FF">*          activity_group                = cwa_auth-activity_group</font>
+<font color ="#0000FF">*          enqueue_and_transport         = ''</font>
+<font color ="#0000FF">*          show_dialog                   = ''</font>
+<font color ="#0000FF">*        exceptions</font>
+<font color ="#0000FF">*          not_authorized                = 1</font>
+<font color ="#0000FF">*          transport_check_problem       = 2</font>
+<font color ="#0000FF">*          transport_canceled_or_problem = 3</font>
+<font color ="#0000FF">*          one_or_more_users_enqueued    = 4</font>
+<font color ="#0000FF">*          foreign_lock                  = 5</font>
+<font color ="#0000FF">*          user_cancels_action           = 6</font>
+<font color ="#0000FF">*          child_agr_exists              = 7</font>
+<font color ="#0000FF">*          deletion_in_target_cancelled  = 8</font>
+<font color ="#0000FF">*          tech_error                    = 9</font>
+<font color ="#0000FF">*          hr_error                      = 10</font>
+<font color ="#0000FF">*          others                        = 11.</font>
+<font color ="#0000FF">*      if sy-subrc &lt;&gt; 0.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Output message.</font>
+<font color ="#0000FF">*        v_mtext = |Error deleting Role '{ cwa_auth-activity_group }'.|.</font>
+<font color ="#0000FF">*        write: / v_mtext.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      else.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Output message.</font>
+<font color ="#0000FF">*        v_mtext = |Role '{ cwa_auth-activity_group }' deleted.|.</font>
+<font color ="#0000FF">*        write: / v_mtext.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "delete_role</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method create_role.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_brllt                     type z_auth_brllt.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_activity_group_text       type agr_title,</font>
+<font color ="#0000FF">*      lv_comment_text_line_1       type agr_title,</font>
+<font color ="#0000FF">*      lv_comment_text_line_2       type agr_title,</font>
+<font color ="#0000FF">*      lv_comment_text_line_3       type agr_title,</font>
+<font color ="#0000FF">*      lv_comment_text_line_4       type agr_title,</font>
+<font color ="#0000FF">*      lwa_return                   type bapiret2,</font>
+<font color ="#0000FF">*      lt_return                    type table of bapiret2.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_act_prof_text             type xutext,</font>
+<font color ="#0000FF">*      lt_tcodes                    type table of ssm_tcodes.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Derive role title.</font>
+<font color ="#0000FF">*    lv_activity_group_text = |Report Consumer - { cwa_auth-funct } - { cwa_auth-sfunc } - Business Role { substring( val = cwa_auth-brlid off = 2 ) }|.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Retrieve the Business Role description.</font>
+<font color ="#0000FF">*    select single</font>
+<font color ="#0000FF">*        brllt</font>
+<font color ="#0000FF">*      into lv_brllt</font>
+<font color ="#0000FF">*      from zzx_auth_brlt</font>
+<font color ="#0000FF">*      where brlid = cwa_auth-brlid and</font>
+<font color ="#0000FF">*            spras = 'E'.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Derive role text.</font>
+<font color ="#0000FF">*    lv_comment_text_line_1 = |This role grants access for:|.</font>
+<font color ="#0000FF">*    lv_comment_text_line_2 = |• The { cwa_auth-funct }-{ cwa_auth-sfunc } content.|.</font>
+<font color ="#0000FF">*    lv_comment_text_line_3 = |• Suitable for Business Role '{ lv_brllt }'.|.</font>
+<font color ="#0000FF">*    lv_comment_text_line_4 = ''.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    if p_simul8 = rs_c_true.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Output message.</font>
+<font color ="#0000FF">*      v_mtext = |Role '{ cwa_auth-activity_group }' created.|.</font>
+<font color ="#0000FF">*      write: / v_mtext.</font>
+<font color ="#0000FF">*      return.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Generate a unique profile name.</font>
+<font color ="#0000FF">*    call function 'PRGN_PROFILE_NAME_GET'</font>
+<font color ="#0000FF">*      exporting</font>
+<font color ="#0000FF">*        act_objid        = cwa_auth-activity_group</font>
+<font color ="#0000FF">*      importing</font>
+<font color ="#0000FF">*        act_profile_name = cwa_auth-act_profile_name</font>
+<font color ="#0000FF">*        act_prof_text    = lv_act_prof_text.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Create the role.</font>
+<font color ="#0000FF">*    call function 'PRGN_RFC_CREATE_ACTIVITY_GROUP'</font>
+<font color ="#0000FF">*      exporting</font>
+<font color ="#0000FF">*        activity_group                = cwa_auth-activity_group</font>
+<font color ="#0000FF">*        activity_group_text           = lv_activity_group_text</font>
+<font color ="#0000FF">*        comment_text_line_1           = lv_comment_text_line_1</font>
+<font color ="#0000FF">*        comment_text_line_2           = lv_comment_text_line_2</font>
+<font color ="#0000FF">*        comment_text_line_3           = lv_comment_text_line_3</font>
+<font color ="#0000FF">*        comment_text_line_4           = lv_comment_text_line_4</font>
+<font color ="#0000FF">*        profile_name                  = cwa_auth-act_profile_name</font>
+<font color ="#0000FF">*        profile_text                  = lv_act_prof_text</font>
+<font color ="#0000FF">*        org_levels_with_star          = ''</font>
+<font color ="#0000FF">*        no_dialog                     = 'X'</font>
+<font color ="#0000FF">*        unmaintained_fields_with_star = ''</font>
+<font color ="#0000FF">*        template                      = ''</font>
+<font color ="#0000FF">*        only_tcode_assignment         = ''</font>
+<font color ="#0000FF">*      tables</font>
+<font color ="#0000FF">*        tcodes                        = lt_tcodes</font>
+<font color ="#0000FF">*        return                        = lt_return</font>
+<font color ="#0000FF">*      exceptions</font>
+<font color ="#0000FF">*        activity_group_already_exists = 1</font>
+<font color ="#0000FF">*        activity_group_enqueued       = 2</font>
+<font color ="#0000FF">*        namespace_problem             = 3</font>
+<font color ="#0000FF">*        illegal_characters            = 4</font>
+<font color ="#0000FF">*        error_when_creating_actgroup  = 5</font>
+<font color ="#0000FF">*        profile_name_exists           = 6</font>
+<font color ="#0000FF">*        profile_not_in_namespace      = 7</font>
+<font color ="#0000FF">*        no_auth_data_selected         = 8</font>
+<font color ="#0000FF">*        illegal_tcodes                = 9</font>
+<font color ="#0000FF">*        not_authorized                = 10</font>
+<font color ="#0000FF">*        profgen_tables_not_updated    = 11</font>
+<font color ="#0000FF">*        error_when_generating_profile = 12</font>
+<font color ="#0000FF">*        others                        = 13.</font>
+<font color ="#0000FF">*    if sy-subrc &lt;&gt; 0.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      loop at lt_return into lwa_return.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Output message.</font>
+<font color ="#0000FF">*        message</font>
+<font color ="#0000FF">*          id lwa_return-id</font>
+<font color ="#0000FF">*          type lwa_return-type</font>
+<font color ="#0000FF">*          number lwa_return-number</font>
+<font color ="#0000FF">*          with</font>
+<font color ="#0000FF">*             lwa_return-message_v1</font>
+<font color ="#0000FF">*             lwa_return-message_v2</font>
+<font color ="#0000FF">*             lwa_return-message_v3</font>
+<font color ="#0000FF">*             lwa_return-message_v4</font>
+<font color ="#0000FF">*          into v_mtext.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        write: / v_mtext.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      endloop.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    else.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Output message.</font>
+<font color ="#0000FF">*      v_mtext = |Role '{ cwa_auth-activity_group }' created.|.</font>
+<font color ="#0000FF">*      write: / v_mtext.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "create_role</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method get_auth_obj_values.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_auth                      type xuauth.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_external_template_data   type tvordata,</font>
+<font color ="#0000FF">*      lt_external_template_data    type table of tvordata,</font>
+<font color ="#0000FF">*      lt_ext                       type table of tvordata.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lv_index                     type i.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set authorisation values for the Analysis Authorisation.</font>
+<font color ="#0000FF">*    loop at cwa_auth-t_auth into lv_auth.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      lv_index = sy-tabix.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      lwa_external_template_data-object   = 'S_RS_AUTH'.</font>
+<font color ="#0000FF">*      lwa_external_template_data-lfdnr    = ''.</font>
+<font color ="#0000FF">*      lwa_external_template_data-field    = 'BIAUTH'.</font>
+<font color ="#0000FF">*      lwa_external_template_data-low      = lv_auth.</font>
+<font color ="#0000FF">*      lwa_external_template_data-high     = ''.</font>
+<font color ="#0000FF">*      lwa_external_template_data-modifier = sy-uname.</font>
+<font color ="#0000FF">*      lwa_external_template_data-moddate  = sy-datum.</font>
+<font color ="#0000FF">*      lwa_external_template_data-modtime  = sy-uzeit.</font>
+<font color ="#0000FF">*      append lwa_external_template_data to lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endloop.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set authorisation values for the InfoArea.</font>
+<font color ="#0000FF">*    call method s_rs_comp</font>
+<font color ="#0000FF">*      exporting</font>
+<font color ="#0000FF">*        iv_iarea = cwa_auth-iarea</font>
+<font color ="#0000FF">*      importing</font>
+<font color ="#0000FF">*        et_ext   = lt_ext</font>
+<font color ="#0000FF">*      changing</font>
+<font color ="#0000FF">*        cv_index = lv_index.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lines of lt_ext to lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Set authorisation values for the Queries.</font>
+<font color ="#0000FF">*    call method s_rs_comp1</font>
+<font color ="#0000FF">*      importing</font>
+<font color ="#0000FF">*        et_ext   = lt_ext</font>
+<font color ="#0000FF">*      changing</font>
+<font color ="#0000FF">*        cv_index = lv_index.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    append lines of lt_ext to lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    cwa_auth-t_external_template_data = lt_external_template_data.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "get_auth_obj_values</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method delete_profile.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    if p_simul8 = rs_c_true.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      return.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Delete the profile if it exists.</font>
+<font color ="#0000FF">*    call function 'SUPRN_DELETE_PROFILE'</font>
+<font color ="#0000FF">*      exporting</font>
+<font color ="#0000FF">*        profile             = cwa_auth-act_profile_name</font>
+<font color ="#0000FF">*      exceptions</font>
+<font color ="#0000FF">*        profile_not_deleted = 1</font>
+<font color ="#0000FF">*        others              = 2.</font>
+<font color ="#0000FF">*    if sy-subrc &lt;&gt; 0.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Output message.</font>
+<font color ="#0000FF">*      v_mtext = |Error deletion Profile '{ cwa_auth-act_profile_name }'.|.</font>
+<font color ="#0000FF">*      write: / v_mtext.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    else.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Output message.</font>
+<font color ="#0000FF">*      v_mtext = |Profile '{ cwa_auth-act_profile_name }' deleted.|.</font>
+<font color ="#0000FF">*      write: / v_mtext.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "delete_profile</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  method create_profile.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    data:</font>
+<font color ="#0000FF">*      lwa_return                   type bapiret2,</font>
+<font color ="#0000FF">*      lt_return                    type bapiret2_t,</font>
+<font color ="#0000FF">*      lt_tcodes                    type table of ssm_tcodes.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    if p_simul8 = rs_c_true.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Output message.</font>
+<font color ="#0000FF">*      v_mtext = |Profile '{ cwa_auth-act_profile_name }' adjusted and Role '{ cwa_auth-activity_group }' saved.|.</font>
+<font color ="#0000FF">*      write: / v_mtext.</font>
+<font color ="#0000FF">*      return.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    "Adjust the profile.</font>
+<font color ="#0000FF">*    call function 'SUPRN_DARK_MANIPULATE_PROFILE'</font>
+<font color ="#0000FF">*      exporting</font>
+<font color ="#0000FF">*        activity_group                = cwa_auth-activity_group</font>
+<font color ="#0000FF">*        profile_name                  = cwa_auth-act_profile_name</font>
+<font color ="#0000FF">*        use_external_template_data    = 'X'</font>
+<font color ="#0000FF">*        generate_profile              = 'X'</font>
+<font color ="#0000FF">*      importing</font>
+<font color ="#0000FF">*        return                        = lt_return</font>
+<font color ="#0000FF">*      tables</font>
+<font color ="#0000FF">*        tcodes                        = lt_tcodes</font>
+<font color ="#0000FF">*        external_template_data        = cwa_auth-t_external_template_data</font>
+<font color ="#0000FF">*      exceptions</font>
+<font color ="#0000FF">*        profile_not_in_namespace      = 1</font>
+<font color ="#0000FF">*        profile_name_exists           = 2</font>
+<font color ="#0000FF">*        no_auth_for_role_change       = 3</font>
+<font color ="#0000FF">*        no_auth_for_prof_creation     = 4</font>
+<font color ="#0000FF">*        no_auth_for_auth_maint        = 5</font>
+<font color ="#0000FF">*        no_auth_for_gen               = 6</font>
+<font color ="#0000FF">*        no_auths                      = 7</font>
+<font color ="#0000FF">*        open_auths                    = 8</font>
+<font color ="#0000FF">*        too_many_auths                = 9</font>
+<font color ="#0000FF">*        error_when_generating_profile = 10</font>
+<font color ="#0000FF">*        others                        = 11.</font>
+<font color ="#0000FF">*    if sy-subrc &lt;&gt; 0.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      loop at lt_return into lwa_return.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        "Output message.</font>
+<font color ="#0000FF">*        message</font>
+<font color ="#0000FF">*          id lwa_return-id</font>
+<font color ="#0000FF">*          type lwa_return-type</font>
+<font color ="#0000FF">*          number lwa_return-number</font>
+<font color ="#0000FF">*          with</font>
+<font color ="#0000FF">*             lwa_return-message_v1</font>
+<font color ="#0000FF">*             lwa_return-message_v2</font>
+<font color ="#0000FF">*             lwa_return-message_v3</font>
+<font color ="#0000FF">*             lwa_return-message_v4</font>
+<font color ="#0000FF">*          into v_mtext.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*        write: / v_mtext.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      endloop.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    else.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*      "Output message.</font>
+<font color ="#0000FF">*      v_mtext = |Profile '{ cwa_auth-act_profile_name }' adjusted and Role '{ cwa_auth-activity_group }' saved|.</font>
+<font color ="#0000FF">*      write: / v_mtext.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*    endif.</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*  endmethod.                    "create_profile</font>
+
+endclass.                    "lcl IMPLEMENTATION
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* OPT Options</font>
+<font color ="#0000FF">* SEL Selections</font>
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_GEN8AA         Generate Analysis Auths</font>
+<font color ="#0000FF">* P_GEN8ID         Generate Unique ID for Auth</font>
+<font color ="#0000FF">* P_GEN8RL         Generate Role and assign Auth</font>
+<font color ="#0000FF">* P_SIMUL8         Simulate</font>
+<font color ="#0000FF">* S_BRLID D       .</font>
+<font color ="#0000FF">* S_IAREA D       .</font>
+<font color ="#0000FF">* S_POSIT D       .</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

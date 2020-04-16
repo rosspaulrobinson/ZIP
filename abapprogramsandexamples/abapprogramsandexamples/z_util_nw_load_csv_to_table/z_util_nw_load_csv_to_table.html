@@ -1,0 +1,206 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_NW_LOAD_CSV_TO_TABLE</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_NW_LOAD_CSV_TO_TABLE</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Copy data in CSV format to table</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_NW_LOAD_CSV_TO_TABLE</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_nw_load_csv_to_table.
+
+load-of-program.
+
+  parameters p_tabnm type tabname16 obligatory.
+
+  parameters p_filnm type string    obligatory default 'C:\Data\UploadToTable.txt' lower case.
+
+  selection-screen begin of block opt with frame title text-opt.
+
+  parameters p_hdrln type rs_bool              default 'X' .
+
+  parameters p_dlmtr type c         obligatory default ';'.
+
+  parameters p_escpe type c         obligatory default '"'.
+
+  selection-screen end of block opt.
+
+at selection-screen on p_tabnm.
+
+  data:
+    lv_name                        type e071-obj_name,
+    lv_exists                      type dd02l-actflag.
+
+  if not ( p_tabnm(1) = 'Z' or p_tabnm(1) = 'Y' ).
+
+    "Check the table is in the customer namespace.
+    message 'Only tables with a Z or Y prefix are supported' type 'E'.
+
+  else.
+
+    lv_name = p_tabnm.
+
+    "Check the table exists.
+    call function 'DD_OBJECT_EXISTS'
+      exporting
+        class         = 'TABL'
+        name          = lv_name
+        state         = 'A'
+      importing
+        exists        = lv_exists
+      exceptions
+        illegal_input = 1
+        others        = 2.
+    if sy-subrc &lt;&gt; 0 or lv_exists &lt;&gt; 'A'.
+
+      message 'Table does not exist in the Data Diactionary.' type 'E'.
+
+    endif.
+  endif.
+
+start-of-selection.
+
+  data:
+    lv_filename                    type string,
+    lwa_data_tab                   type string,
+    lt_data_tab                    type stringtab,
+    lt_fieldnm                     type stringtab,
+    lv_fieldvl                     type string,
+    lt_fieldvl                     type stringtab,
+    lr_data                        type ref to data,
+    lv_tabix                       type i.
+
+  field-symbols:
+    &lt;lwa_data&gt;                     type any,
+    &lt;lt_data&gt;                      type standard table,
+    &lt;lwa_fieldnm&gt;                  type string,
+    &lt;lv_comp&gt;                      type any.
+
+  lv_filename = p_filnm.
+
+  call method cl_gui_frontend_services=&gt;gui_upload
+    exporting
+      filename                = lv_filename
+    changing
+      data_tab                = lt_data_tab
+    exceptions
+      file_open_error         = 1
+      file_read_error         = 2
+      no_batch                = 3
+      gui_refuse_filetransfer = 4
+      invalid_type            = 5
+      no_authority            = 6
+      unknown_error           = 7
+      bad_data_format         = 8
+      header_not_allowed      = 9
+      separator_not_allowed   = 10
+      header_too_long         = 11
+      unknown_dp_error        = 12
+      access_denied           = 13
+      dp_out_of_memory        = 14
+      disk_full               = 15
+      dp_timeout              = 16
+      not_supported_by_gui    = 17
+      error_no_gui            = 18
+      others                  = 19.
+  if sy-subrc &lt;&gt; 0.
+<font color ="#0000FF">*   Implement suitable error handling here</font>
+  endif.
+
+  create data lr_data type table of (p_tabnm).
+  assign lr_data-&gt;* to &lt;lt_data&gt;.
+
+  if p_hdrln = 'X'.
+
+    "Retrieve header line.
+    read table lt_data_tab into lwa_data_tab index 1.
+
+    "Split at delimiter.
+    split lwa_data_tab at p_dlmtr into table lt_fieldnm.
+
+    loop at lt_fieldnm assigning &lt;lwa_fieldnm&gt;.
+
+      "Remove escape characters.
+      replace first occurrence of regex '^\"' in &lt;lwa_fieldnm&gt; with ''.
+      replace first occurrence of regex '\"$' in &lt;lwa_fieldnm&gt; with ''.
+
+    endloop.
+
+    "Delete header line.
+    delete lt_data_tab index 1.
+
+    "Process source data.
+    loop at lt_data_tab into lwa_data_tab.
+
+      append initial line to &lt;lt_data&gt; assigning &lt;lwa_data&gt;.
+
+      "Split at delimiter.
+      split lwa_data_tab at p_dlmtr into table lt_fieldvl.
+
+      loop at lt_fieldnm assigning &lt;lwa_fieldnm&gt;.
+
+        lv_tabix = sy-tabix.
+
+        unassign &lt;lv_comp&gt;.
+        assign component &lt;lwa_fieldnm&gt; of structure &lt;lwa_data&gt; to &lt;lv_comp&gt;.
+        if &lt;lv_comp&gt; is assigned.
+
+          read table lt_fieldvl into lv_fieldvl index lv_tabix.
+
+          "Remove escape characters.
+          replace first occurrence of regex '^\"' in lv_fieldvl with ''.
+          replace first occurrence of regex '\"$' in lv_fieldvl with ''.
+
+          &lt;lv_comp&gt; = lv_fieldvl.
+
+        endif.
+
+      endloop.
+
+    endloop.
+
+  endif.
+
+  if &lt;lt_data&gt; is not initial.
+
+    modify (p_tabnm) from table &lt;lt_data&gt;.
+
+  endif.
+
+  return.
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* OPT Options</font>
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_DLMTR         Delimiter character</font>
+<font color ="#0000FF">* P_ESCPE         Escape character</font>
+<font color ="#0000FF">* P_FILNM         Source file name</font>
+<font color ="#0000FF">* P_HDRLN         Header on first line</font>
+<font color ="#0000FF">* P_TABNM         Target table name</font>
+
+
+<font color ="#0000FF">*Messages</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">* Message class: Hard coded</font>
+<font color ="#0000FF">*   Only tables with a Z or Y prefix are supported</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

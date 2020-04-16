@@ -1,0 +1,222 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>ZSMN_BPC_UJX0_USER_REC</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: ZSMN_BPC_UJX0_USER_REC</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  BPC adjust Request-Response settings - UJX0_USER_REC</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  ZSMN_BPC_UJX0_USER_REC</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*& Refer to SAPScript for further details.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report zsmn_bpc_ujx0_user_rec.
+
+selection-screen begin of block b1 with frame title text-001.
+select-options s_usrnm for sy-uname obligatory.
+selection-screen end of block b1.
+
+selection-screen begin of block b2 with frame title text-002.
+parameters p_log type rs_bool radiobutton group rg1  default 'X'.
+parameters p_nolog type rs_bool radiobutton group rg1.
+selection-screen end of block b2.
+
+selection-screen begin of block b3 with frame title text-003.
+parameters p_commit type rs_bool.
+selection-screen end of block b3.
+
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl DEFINITION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl definition.
+
+  public section.
+
+    class-methods main.
+    class-methods activate_log.
+    class-methods deactivate_log.
+
+endclass.                    "lcl DEFINITION
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl IMPLEMENTATION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl implementation.
+
+  method main.
+
+    if p_log = 'X'.
+
+      activate_log( ).
+
+    elseif p_nolog = 'X'.
+
+      deactivate_log( ).
+
+    endif.
+
+  endmethod.                    "main
+
+  method activate_log.
+
+    data:
+      lv_usrnm                     type sy-uname,
+      lt_dv_usrnm                  type table of sy-uname,
+      lv_user_id                   type uj_user_id,
+      lwa_user_rec                 type ujx0_user_rec,
+      lt_user_rec                  type table of ujx0_user_rec,
+      lth_user_rec                 type hashed table of ujx0_user_rec with unique key user_id,
+      lv_mtext                     type string.
+
+    "Retrieve users.
+    select
+        bname
+      into table lt_dv_usrnm
+      from usr02
+      where bname in s_usrnm.
+    if sy-subrc &lt;&gt; 0.
+
+      lv_mtext = |No records found in table USR02 for the selection.|.
+      message lv_mtext type 'I'.
+      return.
+
+    endif.
+
+    "Retrieve Request-Response user settings.
+    select *
+      into table lth_user_rec
+      from ujx0_user_rec.
+
+    "Populate the Request-Response settings.
+    loop at lt_dv_usrnm into lv_usrnm.
+
+      "Translate 12 character username to 60 character user ID.
+      lv_user_id = lv_usrnm.
+
+      "Check if the user has an entry in the Request-Response control table.
+      read table lth_user_rec into lwa_user_rec
+        with table key
+          user_id = lv_user_id.
+      if sy-subrc &lt;&gt; 0.
+
+        lwa_user_rec-user_id = lv_user_id.
+        lwa_user_rec-recordable = 'X'.
+        lwa_user_rec-rec_seq_num = ''.
+        append lwa_user_rec to lt_user_rec.
+
+      else.
+
+        if lwa_user_rec-rec_seq_num = 99999999.
+          clear lwa_user_rec-rec_seq_num.
+        endif.
+
+        lwa_user_rec-user_id = lv_user_id.
+        lwa_user_rec-recordable = 'X'.
+        append lwa_user_rec to lt_user_rec.
+
+      endif.
+
+    endloop.
+
+    "Modify Request-Response user settings.
+    if p_commit = 'X'.
+      modify ujx0_user_rec from table lt_user_rec.
+    endif.
+
+    lv_mtext = |{ lines( lt_user_rec ) } records modified in table UJX0_USER_REC.|.
+    message lv_mtext type 'I'.
+
+  endmethod.                    "activate_log
+
+  method deactivate_log.
+
+    data:
+      lv_usrnm                     type sy-uname,
+      lt_dv_usrnm                  type table of sy-uname,
+      lv_user_id                   type uj_user_id,
+      lwa_user_rec                 type ujx0_user_rec,
+      lt_user_rec                  type table of ujx0_user_rec,
+      lv_mtext                     type string.
+
+    select
+        bname
+      into table lt_dv_usrnm
+      from usr02
+      where bname in s_usrnm.
+    if sy-subrc &lt;&gt; 0.
+
+      lv_mtext = |No records found in table USR02 for the selection.|.
+      message lv_mtext type 'I'.
+      return.
+
+    endif.
+
+    "Populate the Request-Response settings.
+    loop at lt_dv_usrnm into lv_usrnm.
+
+      "Translate 12 character username to 60 character user ID.
+      lv_user_id = lv_usrnm.
+
+      "Set the user ID.
+      lwa_user_rec-user_id = lv_user_id.
+
+      "Clear the recordable flag.
+      lwa_user_rec-recordable = ''.
+
+      "Set the sequence number to the override value (DataSource ZBW_UJRS_TRANS will not override this)
+      lwa_user_rec-rec_seq_num = 99999999.
+      append lwa_user_rec to lt_user_rec.
+
+    endloop.
+
+    "Modify selected Request-Response settings.
+    if p_commit = 'X'.
+      modify ujx0_user_rec from table lt_user_rec.
+    endif.
+
+    lv_mtext = |{ lines( lt_user_rec ) } records modified in table UJX0_USER_REC.|.
+    message lv_mtext type 'I'.
+
+  endmethod.                    "deactivate_log
+
+endclass.                    "lcl IMPLEMENTATION
+
+start-of-selection.
+
+  lcl=&gt;main( ).
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* 001 Select users</font>
+<font color ="#0000FF">* 002 Action</font>
+<font color ="#0000FF">* 003 Options</font>
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_COMMIT         Commit</font>
+<font color ="#0000FF">* P_LOG         Activate logging for users</font>
+<font color ="#0000FF">* P_NOLOG         Deactivate logging for users</font>
+<font color ="#0000FF">* S_USRNM D       .</font>
+
+
+<font color ="#0000FF">*Messages</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">*YPE</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_BPC_PROCESS_DIMENSION</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_BPC_PROCESS_DIMENSION</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Process BPC Dimension</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_BPC_PROCESS_DIMENSION</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This program can be used to process a dimension in BPC classic,</font>
+<font color ="#0000FF">*&  this can be useful in diagnosing via debug.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_bpc_process_dimension.
+
+load-of-program.
+
+  data:
+    lo_member_mgr                  type ref to if_uja_member_manager.
+
+  data:
+    lwa_dim_list                   type uja_s_dim_name,
+    lt_dim_list                    type uja_t_dim_name,
+    lv_success                     type rs_bool,
+    lt_message_lines               type uj0_t_message.
+
+  parameters p_appid type uj_appset_id.
+  parameters p_dimid type uj_dim_name.
+
+start-of-selection.
+
+  create object lo_member_mgr type cl_ujam_member
+    exporting
+      i_appset_id    = p_appid
+      i_dimension_id = p_dimid.
+
+  lwa_dim_list-dimension = 'C_FC_CLASS'.
+  append lwa_dim_list to lt_dim_list.
+
+  try.
+
+      call method lo_member_mgr-&gt;process
+        exporting
+          it_dim_list      = lt_dim_list
+          if_set_offline   = abap_false
+          if_validate      = abap_false
+        importing
+          ef_success       = lv_success
+          et_message_lines = lt_message_lines.
+
+    catch cx_uja_admin_error .
+    catch cx_uj_no_auth .
+  endtry.
+
+  return.
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

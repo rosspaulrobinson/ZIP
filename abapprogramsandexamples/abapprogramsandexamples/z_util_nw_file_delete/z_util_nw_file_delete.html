@@ -1,0 +1,200 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_NW_FILE_DELETE</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_NW_FILE_DELETE</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Delete file from Application Server</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_104087_FILE_DELETE</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This program can delete files from the application server, it</font>
+<font color ="#0000FF">*&  uses a regular expression to identify file matches. The program</font>
+<font color ="#0000FF">*&  uses two SAP standard function modules that apply file length</font>
+<font color ="#0000FF">*&  limits, so if the file name exceeds these limits it will not be</font>
+<font color ="#0000FF">*&  deleted.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_nw_file_delete.
+
+
+selection-screen begin of block src with frame title t_src.
+parameters p_dir type c length 200 lower case default '/usr/sap/trans/temp/DEV/DRA/'.
+selection-screen end of block src.
+
+selection-screen begin of block sel with frame title t_sel.
+parameters p_regex type string lower case default '.*(PMCO).*(.bin|.txt)'.
+selection-screen end of block sel.
+
+selection-screen begin of block opt with frame title t_opt.
+parameters p_commit type rs_bool.
+parameters p_joblog type rs_bool default 'X'.
+selection-screen end of block opt.
+
+initialization.
+
+  t_src = 'Directory on Application Server'.
+  t_sel = 'Filter files using Regular Expression'.
+  t_opt = 'Options'.
+
+start-of-selection.
+
+  data:
+    lv_dir                         type c length 200,
+    lv_regex                       type string,
+    lv_commit                      type rs_bool,
+    lv_joblog                      type rs_bool.
+
+  data:
+    lwa_file                       type salfldir,
+    lt_file                        type table of salfldir,
+    lv_file                        type pfeflname,
+    lt_dv_file                     type table of pfeflname,
+    lv_filename                    type fileextern.
+
+  data:
+    lv_percentage                  type i,
+    lv_mtext                       type string,
+    lt_mtext                       type stringtab.
+
+  field-symbols:
+    &lt;lv_param&gt;                     type any.
+
+  assign ('P_DIR') to &lt;lv_param&gt;.
+  if sy-subrc = 0.
+    lv_dir = &lt;lv_param&gt;.
+  endif.
+
+  assign ('P_REGEX') to &lt;lv_param&gt;.
+  if sy-subrc = 0.
+    lv_regex = &lt;lv_param&gt;.
+  endif.
+
+  assign ('P_COMMIT') to &lt;lv_param&gt;.
+  if sy-subrc = 0.
+    lv_commit = &lt;lv_param&gt;.
+  endif.
+
+  assign ('P_JOBLOG') to &lt;lv_param&gt;.
+  if sy-subrc = 0.
+    lv_joblog = &lt;lv_param&gt;.
+  endif.
+
+  if lv_dir is initial or
+    lv_regex is initial.
+
+    lv_dir    = '/usr/sap/trans/temp/DEV/DRA/'.
+    lv_regex  = '.*(PMCO).*(.bin|.txt)'.
+    lv_commit = 'X'.
+    lv_joblog = 'X'.
+
+  endif.
+
+  "Retrieve directory contents.
+  call function 'RZL_READ_DIR_LOCAL'
+    exporting
+      name               = lv_dir
+    tables
+      file_tbl           = lt_file
+    exceptions
+      argument_error     = 1
+      not_found          = 2
+      no_admin_authority = 3
+      others             = 4.
+  if sy-subrc &lt;&gt; 0.
+    return.
+  endif.
+
+  "Collect files in the selection.
+  loop at lt_file into lwa_file.
+
+    "Match the pattern.
+    find regex lv_regex in lwa_file-name.
+    if sy-subrc = 0.
+
+      "Collect the file.
+      lv_file = lwa_file-name.
+      append lv_file to lt_dv_file.
+
+    endif.
+
+  endloop.
+
+  if lv_joblog = rs_c_true.
+
+    lv_mtext = |Directory contains { lines( lt_file ) } files.|.
+    write: / lv_mtext.
+
+    lv_mtext = |{ lines( lt_dv_file ) } files match the REGEX filter.|.
+    write: / lv_mtext.
+
+    lv_mtext = 'The following files will be deleted.'.
+    write: / lv_mtext.
+
+    skip.
+
+    loop at lt_dv_file into lv_file.
+
+      lv_mtext = lv_file.
+      write: / lv_mtext.
+
+    endloop.
+
+  endif.
+
+  "Loop through files.
+  loop at lt_dv_file into lv_file.
+
+    "Define message.
+    lv_mtext = ( sy-tabix / lines( lt_dv_file ) ) * 100.
+    lv_percentage = lv_mtext.
+    lv_mtext = |File { sy-tabix } of { lines( lt_dv_file ) } being transferred.|.
+
+    call function 'SAPGUI_PROGRESS_INDICATOR'
+      exporting
+        percentage = lv_percentage
+        text       = lv_mtext.
+
+    lv_filename = |{ lv_dir }{ lv_file }|.
+
+    if lv_commit = 'X'.
+
+      "Delete file.
+      call function 'SCMS_FILE_DELETE'
+        exporting
+          filename      = lv_filename
+        exceptions
+          not_found     = 1
+          name_too_long = 2
+          others        = 3.
+      if sy-subrc &lt;&gt; 0.
+        return.
+      endif.
+
+    endif.
+
+  endloop.
+
+
+  return.
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_COMMIT         Confirm file deletion</font>
+<font color ="#0000FF">* P_DIR         Directory</font>
+<font color ="#0000FF">* P_JOBLOG         Write Job Log</font>
+<font color ="#0000FF">* P_REGEX         Filter (REGEX)</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

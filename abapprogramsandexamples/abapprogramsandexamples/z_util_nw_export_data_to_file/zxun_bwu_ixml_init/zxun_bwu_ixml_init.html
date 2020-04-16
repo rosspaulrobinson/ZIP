@@ -1,0 +1,76 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>ZXUN_BWU_IXML_INIT</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for function: ZXUN_BWU_IXML_INIT</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Interface XML - Initialise</b></font>
+<hr>
+<pre width="100">
+function zxun_bwu_ixml_init.
+<font color ="#0000FF">*"----------------------------------------------------------------------</font>
+<font color ="#0000FF">*"*"Local Interface:</font>
+<font color ="#0000FF">*"  IMPORTING</font>
+<font color ="#0000FF">*"     VALUE(IV_SELECT) TYPE  STRING</font>
+<font color ="#0000FF">*"     VALUE(IV_FROM) TYPE  STRING</font>
+<font color ="#0000FF">*"     VALUE(IV_WHERE) TYPE  STRING OPTIONAL</font>
+<font color ="#0000FF">*"     VALUE(IV_GROUPBY) TYPE  STRING OPTIONAL</font>
+<font color ="#0000FF">*"     VALUE(IV_ORDERBY) TYPE  STRING OPTIONAL</font>
+<font color ="#0000FF">*"     VALUE(IV_PACKSIZE) TYPE  I DEFAULT 5000</font>
+<font color ="#0000FF">*"     VALUE(IV_PACKAGES) TYPE  I DEFAULT 1</font>
+<font color ="#0000FF">*"  EXCEPTIONS</font>
+<font color ="#0000FF">*"      SETUP_ERROR</font>
+<font color ="#0000FF">*"----------------------------------------------------------------------</font>
+
+<font color ="#0000FF">*       <a href ="global-zxun_bwu_ixml_init.html">Global data declarations</a></font>
+
+  data:
+    lv_up_to_rows                  type i.
+
+  field-symbols:
+    &lt;lt_data&gt;                      type standard table.
+
+  "Clear reference data.
+  clear r_data.
+
+  "Set package size.
+  v_packsize = iv_packsize.
+
+  "Create reference data object.
+  try.
+
+      create data r_data type table of (iv_from).
+
+    catch cx_sy_create_data_error.
+      raise setup_error.
+  endtry.
+
+  "Assign reference data object to field symbol.
+  assign r_data-&gt;* to &lt;lt_data&gt;.
+
+  "Calculate maximum number of rows retrieved.
+  lv_up_to_rows = iv_packsize * iv_packages.
+
+  "Retrieve all data.
+  try.
+
+      select (iv_select) up to lv_up_to_rows rows
+        into corresponding fields of table &lt;lt_data&gt;
+        from (iv_from)
+        where (iv_where)
+        group by (iv_groupby)
+        order by (iv_orderby).
+
+    catch cx_sy_dynamic_osql_semantics.
+      raise setup_error.
+  endtry.
+
+endfunction.
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

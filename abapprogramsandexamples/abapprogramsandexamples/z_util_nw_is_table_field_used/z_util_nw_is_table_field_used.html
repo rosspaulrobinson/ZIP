@@ -1,0 +1,444 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_NW_IS_TABLE_FIELD_USED</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_NW_IS_TABLE_FIELD_USED</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Is table field used</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_NW_IS_TABLE_FIELD_USED</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This program can be used to determine the number of fields that</font>
+<font color ="#0000FF">*&  have non-initial unique values. This can be used to determine</font>
+<font color ="#0000FF">*&  which fields should be transferred to a Data Warehouse. The same</font>
+<font color ="#0000FF">*&  can be achieved by refering to transaction DB02 via Space &gt;</font>
+<font color ="#0000FF">*&  Sements &gt; Detailed Analysis. The program retrieves all data from</font>
+<font color ="#0000FF">*&  the selected table and retains a sample between 1 and 100% of the</font>
+<font color ="#0000FF">*&  records. Then, per field, each non-unique value is collected.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_nw_is_table_field_used.
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl DEFINITION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl definition.
+
+  public section.
+
+    types:
+      begin of ty_wa_param,
+        p_tabnm                    type rollname,
+        p_sampl                    type i,
+      end of ty_wa_param.
+
+    types:
+      ty_v_hash                    type c length 64,
+      ty_t_hash                    type table of ty_v_hash with non-unique key table_line.
+
+    types:
+      begin of ty_wa_distinc_values,
+        fldnm                      type rollname,
+        count                      type i,
+        t_hash                     type ty_t_hash,
+      end   of ty_wa_distinc_values,
+      ty_th_distinc_values         type hashed table of ty_wa_distinc_values with unique key fldnm.
+
+    class-data:
+      wa_param                     type ty_wa_param.
+
+    class-methods factory
+      importing
+        iwa_param type ty_wa_param
+      exporting
+        er_lcl    type ref to lcl.
+
+    methods execute.
+
+  private section.
+
+    data:
+      r_wa_data                    type ref to data,
+      r_t_data                     type ref to data,
+      r_t_data_tmp                 type ref to data.
+
+    data:
+      v_count_records              type i,
+      v_count_sample               type i,
+      v_count_fields               type i.
+
+    data:
+      th_distinct_values           type ty_th_distinc_values.
+
+    methods db_read_data.
+
+    methods get_sample.
+
+    methods collect_distinct.
+
+    methods output_results.
+
+endclass.                    "lcl DEFINITION
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl IMPLEMENTATION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl implementation.
+
+  method factory.
+
+    "Create instance of class.
+    create object er_lcl type lcl.
+
+    "Persist import parameter data.
+    er_lcl-&gt;wa_param = iwa_param.
+
+  endmethod.                    "factory
+
+  method execute.
+
+    "Retrieve data from the database.
+    db_read_data( ).
+
+    "Derive the sample.
+    get_sample( ).
+
+    "Collect distinct values.
+    collect_distinct( ).
+
+    "Output results.
+    output_results( ).
+
+  endmethod.                    "execute
+
+  method db_read_data.
+
+    field-symbols:
+      &lt;lt_data&gt;                      type standard table.
+
+    "Create internal table.
+    create data r_t_data type table of (wa_param-p_tabnm).
+    assign r_t_data-&gt;* to &lt;lt_data&gt;.
+
+    try.
+
+        select *
+          into table &lt;lt_data&gt;
+          from (wa_param-p_tabnm).
+
+      catch cx_sy_create_data_error.
+        return.
+    endtry.
+
+    "Persist the number of records retrieved.
+    v_count_records = lines( &lt;lt_data&gt; ).
+
+  endmethod.                    "db_read_data
+
+  method get_sample.
+
+    data:
+      lr_t_data_tmp                type ref to data.
+
+    field-symbols:
+      &lt;lwa_data&gt;                     type any,
+      &lt;lt_data&gt;                      type standard table,
+      &lt;lt_data_tmp&gt;                  type standard table.
+
+    data:
+      lv_sampl                         type i,
+      lo_random                        type ref to cl_abap_random_int,
+      lv_index                         type i,
+      lt_index                         type table of i with key table_line.
+
+    assign r_t_data-&gt;* to &lt;lt_data&gt;.
+
+    "Create internal table.
+    create data lr_t_data_tmp type table of (wa_param-p_tabnm).
+    assign lr_t_data_tmp-&gt;* to &lt;lt_data_tmp&gt;.
+
+    if wa_param-p_sampl &lt;&gt; 100.
+
+      "Create random number generator.
+      lo_random = cl_abap_random_int=&gt;create( min = 1 max = lines( &lt;lt_data&gt; )  ).
+
+      "Determine the number of records in the sample.
+      lv_sampl = ( lines( &lt;lt_data&gt; ) / 100 ) * wa_param-p_sampl.
+
+      do.
+
+        "Get a random number.
+        lv_index = lo_random-&gt;get_next( ).
+
+        "Collect the integers.
+        collect lv_index into lt_index.
+
+        "Stop when sufficient integers are collect for the samle.
+        if lines( lt_index ) &gt;= lv_sampl.
+          exit.
+        endif.
+
+      enddo.
+
+      "Retrieve and retain the records for the sample.
+      loop at lt_index into lv_index.
+
+        read table &lt;lt_data&gt; assigning &lt;lwa_data&gt; index lv_index.
+
+        append &lt;lwa_data&gt; to &lt;lt_data_tmp&gt;.
+
+      endloop.
+
+      &lt;lt_data&gt; = &lt;lt_data_tmp&gt;.
+      clear &lt;lt_data_tmp&gt;.
+
+    endif.
+
+    v_count_sample = lines( &lt;lt_data&gt; ).
+
+  endmethod.                    "get_sample
+
+  method collect_distinct.
+
+    data:
+      lo_struct                    type ref to cl_abap_structdescr,
+      lwa_component                type abap_componentdescr,
+      lt_component                 type abap_component_tab,
+      lwa_distinct_values          type ty_wa_distinc_values,
+      lv_data                      type string,
+      lv_hashstring                type string,
+      lv_hash                      type ty_v_hash.
+
+    field-symbols:
+      &lt;lwa_data&gt;                   type any,
+      &lt;lt_data&gt;                    type standard table,
+      &lt;lv_cmp&gt;                     type any,
+      &lt;lwa_distinct_values&gt;        type ty_wa_distinc_values.
+
+    assign r_t_data-&gt;* to &lt;lt_data&gt;.
+
+    "Create work area.
+    create data r_wa_data type (wa_param-p_tabnm).
+    assign r_wa_data-&gt;* to &lt;lwa_data&gt;.
+
+    "Create a description object for the class.
+    lo_struct ?= cl_abap_structdescr=&gt;describe_by_data( &lt;lwa_data&gt; ).
+
+    "Get the compoenent of the structure.
+    lt_component = lo_struct-&gt;get_components( ).
+
+    "Persist the number of fields in the table.
+    v_count_fields = lines( lt_component ).
+
+    "Create a row for each component in the internal table.
+    loop at lt_component into lwa_component.
+
+      clear lwa_distinct_values.
+      lwa_distinct_values-fldnm = lwa_component-name.
+      insert lwa_distinct_values into table th_distinct_values assigning &lt;lwa_distinct_values&gt;.
+
+    endloop.
+
+    "Loop through each row of source data.
+    loop at &lt;lt_data&gt; assigning &lt;lwa_data&gt;.
+
+      "Loop through each component of the structure.
+      loop at lt_component into lwa_component.
+
+        assign component lwa_component-name of structure &lt;lwa_data&gt; to &lt;lv_cmp&gt;.
+
+        check &lt;lv_cmp&gt; is not initial.
+
+        "Retrieve row for component.
+        read table th_distinct_values assigning &lt;lwa_distinct_values&gt;
+          with table key
+            fldnm = lwa_component-name.
+
+        "Transfer row value to string.
+        lv_data = &lt;lv_cmp&gt;.
+
+        try.
+
+            "Generate hash value.
+            call method cl_abap_message_digest=&gt;calculate_hash_for_char
+              exporting
+                if_algorithm  = 'SHA256'
+                if_data       = lv_data
+              importing
+                ef_hashstring = lv_hashstring.
+
+          catch cx_abap_message_digest.
+        endtry.
+
+        "Transfer string to character field.
+        lv_hash = lv_hashstring.
+
+        collect lv_hash into &lt;lwa_distinct_values&gt;-t_hash.
+
+      endloop.
+
+    endloop.
+
+  endmethod.                    "collect_distinct
+
+  method output_results.
+
+    data:
+      lv_count_empty_fields        type i,
+      lv_flt_empty_fields          type f,
+      lv_pct_empty_fields          type i.
+
+    data:
+      lv_count_populated_fields    type i,
+      lv_flt_populated_fields      type f,
+      lv_pct_populated_fields      type i.
+
+    data:
+      lv_mtext                     type string.
+
+    field-symbols:
+      &lt;lwa_distinct_values&gt;        type ty_wa_distinc_values.
+
+    "Determine the number of distinct values per field.
+    loop at th_distinct_values assigning &lt;lwa_distinct_values&gt;.
+
+      &lt;lwa_distinct_values&gt;-count = lines( &lt;lwa_distinct_values&gt;-t_hash ).
+
+      if &lt;lwa_distinct_values&gt;-count &gt; 0.
+
+        add 1 to lv_count_populated_fields.
+
+      else.
+
+        add 1 to lv_count_empty_fields.
+
+      endif.
+
+    endloop.
+
+    sort th_distinct_values by count descending.
+
+    "Output the number of records retrieved.
+    lv_mtext = |{ v_count_records } records retrieved from table.|.
+    write:/ lv_mtext.
+
+    "OOutput the number of records retained for sample.
+    lv_mtext = |{ v_count_sample } records retained for sample.|.
+    write:/ lv_mtext.
+
+    skip 1.
+
+    "Calculate the percentage of fields populated.
+    lv_flt_populated_fields = ( lv_count_populated_fields / v_count_fields ) * 100.
+    lv_pct_populated_fields = lv_flt_populated_fields.
+
+    "Calculate the percentage of fields empty.
+    lv_flt_empty_fields = ( lv_count_empty_fields / v_count_fields ) * 100.
+    lv_pct_empty_fields = lv_flt_empty_fields.
+
+    "Output the number of fields in the table.
+    lv_mtext = |{ wa_param-p_tabnm } contains { v_count_fields } fields.|.
+    write:/ lv_mtext.
+
+    "Output the number of populated fields in the table.
+    lv_mtext = |There are { lv_count_populated_fields }({ lv_pct_populated_fields }%) fields in use.|.
+    write:/ lv_mtext.
+
+    "Output the number of empty fields in the table.
+    lv_mtext = |There are { lv_count_empty_fields }({ lv_pct_empty_fields }%) fields not in use.|.
+    write:/ lv_mtext.
+
+    skip 1.
+
+    "Output the number of fields.
+    loop at th_distinct_values assigning &lt;lwa_distinct_values&gt;.
+
+      lv_mtext = |{ &lt;lwa_distinct_values&gt;-fldnm width = 30 align = left } contains { &lt;lwa_distinct_values&gt;-count width = 7 align = right } distinct values.|.
+
+      write:/ lv_mtext.
+
+    endloop.
+
+  endmethod.                    "output_results
+
+endclass.                    "lcl IMPLEMENTATION
+
+load-of-program.
+
+  selection-screen begin of block b1 with frame title _title_1.
+  parameters p_tabnm type rollname.
+  selection-screen end of block b1.
+
+  selection-screen begin of block b2 with frame title _title_2.
+  parameters p_sampl type i default 5.
+  selection-screen end of block b2.
+
+initialization.
+
+  _title_1 = 'Selection'.
+  _title_2 = 'Options'.
+
+  %_p_tabnm_%_app_%-text = 'Table name'.
+  %_p_sampl_%_app_%-text = 'Sample size as percentage'.
+
+at selection-screen on p_tabnm.
+
+  select single tabname
+    into p_tabnm
+    from dd02l
+    where
+      tabname = p_tabnm and
+      as4local = 'A'.
+  if sy-subrc &lt;&gt; 0.
+    message 'A valid table name is required' type 'E'.
+  endif.
+
+at selection-screen on p_sampl.
+
+  if not ( p_sampl between 1 and 100 ).
+    message 'Sample size must be between 1 and 100' type 'E'.
+  endif.
+
+start-of-selection.
+
+  data:
+    lr_lcl                         type ref to lcl,
+    lwa_param                      type lcl=&gt;ty_wa_param.
+
+  "Transfer selection-screen parameters to a work area.
+  lwa_param-p_tabnm = p_tabnm.
+  lwa_param-p_sampl = p_sampl.
+
+  "Create instance of class.
+  call method lcl=&gt;factory
+    exporting
+      iwa_param = lwa_param
+    importing
+      er_lcl    = lr_lcl.
+
+  "Execute class.
+  lr_lcl-&gt;execute( ).
+
+  return.
+
+
+<font color ="#0000FF">*Messages</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">* Message class: Hard coded</font>
+<font color ="#0000FF">*   A valid table name is required</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

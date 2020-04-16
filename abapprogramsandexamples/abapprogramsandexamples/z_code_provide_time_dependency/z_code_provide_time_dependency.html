@@ -1,0 +1,156 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_CODE_PROVIDE_TIME_DEPENDENCY</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_CODE_PROVIDE_TIME_DEPENDENCY</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Demo Provide statement to establish time-dependent intervals.</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_CODE_PROVIDE_TIME_DEPENDENCY</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*& This demo program uses the provide statement to establish time-</font>
+<font color ="#0000FF">*& dependent intervals by merging the Employee and Position master</font>
+<font color ="#0000FF">*& data.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_code_provide_time_dependency.
+
+start-of-selection.
+
+  types:
+    begin of ty_wa_mda_employee,
+      employee                     type /bi0/oiemployee,
+      datefrom                     type /bi0/oidatefrom,
+      dateto                       type /bi0/oidateto,
+    end of ty_wa_mda_employee,
+    ty_t_mda_employee              type table of ty_wa_mda_employee.
+
+  types:
+    begin of ty_wa_mda_hrposition,
+      hrposition                   type /bi0/oihrposition,
+      datefrom                     type /bi0/oidatefrom,
+      dateto                       type /bi0/oidateto,
+    end of ty_wa_mda_hrposition,
+    ty_t_mda_hrposition            type table of ty_wa_mda_hrposition.
+
+  types:
+    begin of ty_wa_time_dependency,
+      employee                     type /bi0/oiemployee,
+      hrposition                   type /bi0/oihrposition,
+      datefrom                     type /bi0/oidatefrom,
+      dateto                       type /bi0/oidateto,
+    end of ty_wa_time_dependency,
+    ty_t_time_dependency           type table of ty_wa_time_dependency.
+
+  data:
+    lwa_mda_employee               type ty_wa_mda_employee,
+    lt_mda_employee                type ty_t_mda_employee,
+    lwa_mda_hrposition             type ty_wa_mda_hrposition,
+    lt_mda_hrposition              type ty_t_mda_hrposition,
+    lwa_time_dependency            type ty_wa_time_dependency,
+    lt_time_dependency             type ty_t_time_dependency.
+
+  data:
+    lo_root                        type ref to cx_root.
+
+
+  data:
+    begin of wa1,
+          col1 type i,
+          col2 type i,
+          col3 type string,
+        end of wa1.
+
+  data: begin of wa2,
+          col1 type i,
+          col2 type i,
+          col3 type string,
+        end of wa2.
+
+  data: itab1 like standard table of wa1,
+        itab2 like standard table of wa2.
+
+  data: flag1(1) type c,
+        flag2(1) type c.
+
+  data:
+    lv_output type string,
+    lt_output type stringtab.
+
+
+  wa1-col1 = 1.
+  wa1-col2 = 6.
+  wa1-col3 = 'Itab1 Int1'.
+  append wa1 to itab1.
+
+  wa1-col1 = 9.
+  wa1-col2 = 12.
+  wa1-col3 = 'Itab1 Int2'.
+  append wa1 to itab1.
+
+  wa2-col1 = 4.
+  wa2-col2 = 11.
+  wa2-col3 = 'Itab2 Int1'.
+  append wa2 to itab2.
+
+  "Retrieve Employee master data.
+  select
+      employee
+      dateto
+      datefrom
+    into corresponding fields of table lt_mda_employee ##TOO_MANY_ITAB_FIELDS
+    from /bi0/qemployee
+    where objvers = 'A' and
+          employee = '78342'.
+
+  "Retrieve Position master data.
+  select
+      hrposition
+      dateto
+      datefrom
+    into corresponding fields of table lt_mda_hrposition ##TOO_MANY_ITAB_FIELDS
+    from /bi0/qhrposition
+    where objvers = 'A' and
+          hrposition = '99999999' or hrposition = '20011135'.
+
+  sort lt_mda_employee." by datefrom dateto.
+  sort lt_mda_hrposition." by datefrom dateto.
+
+  provide fields employee from lt_mda_employee into lwa_mda_employee
+                                 valid flag1
+                                 bounds datefrom and dateto
+          fields hrposition from lt_mda_hrposition into lwa_mda_hrposition
+                                 valid flag2
+                                 bounds datefrom and dateto
+          between '00000000' and '99991231'
+          including gaps.
+
+    if flag1 = rs_c_true and flag2 = rs_c_true.
+
+      lwa_time_dependency-employee   = lwa_mda_employee-employee.
+      lwa_time_dependency-hrposition = lwa_mda_hrposition-hrposition.
+      lwa_time_dependency-datefrom   = lwa_mda_employee-datefrom.
+      lwa_time_dependency-dateto     = lwa_mda_employee-dateto.
+
+      append lwa_time_dependency to lt_time_dependency.
+
+    else.
+      continue.
+    endif.
+
+  endprovide.
+
+  return.
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

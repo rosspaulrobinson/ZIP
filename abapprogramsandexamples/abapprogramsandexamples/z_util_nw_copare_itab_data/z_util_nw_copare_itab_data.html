@@ -1,0 +1,498 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_NW_COPARE_ITAB_DATA</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_NW_COPARE_ITAB_DATA</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Compare internal table data - Before and After</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_NW_COPARE_ITAB_DATA</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This program supports the comparison of the data in two tables.</font>
+<font color ="#0000FF">*&  This can be useful for unit testing code renovation because it</font>
+<font color ="#0000FF">*&  can help isolate result set differences from the code before and</font>
+<font color ="#0000FF">*&  after the change. 16 key fields can be used to compare the data.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_nw_copare_itab_data.
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl DEFINITION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl definition.
+
+  public section.
+
+    types:
+      begin of ty_wa_param,
+        p_tabl1                   type rollname,
+        p_tabl2                   type rollname,
+        s_tabkey                   type range of rollname,
+        s_fields                   type range of rollname,
+        p_fields                   type rs_bool,
+      end of ty_wa_param.
+
+    class-data:
+      wa_param                     type ty_wa_param.
+
+    class-methods factory
+      importing
+        iwa_param type ty_wa_param
+      exporting
+        er_lcl    type ref to lcl.
+
+    methods execute.
+
+  private section.
+
+endclass.                    "lcl DEFINITION
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl IMPLEMENTATION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl implementation.
+
+  method factory.
+
+    "Create instance of class.
+    create object er_lcl type lcl.
+
+    "Persist import parameter data.
+    er_lcl-&gt;wa_param = iwa_param.
+
+  endmethod.                    "factory
+
+  method execute.
+
+    data:
+      lwa_s_tabkey                     like line of wa_param-s_tabkey,
+      lwa_s_fields                     like line of wa_param-s_fields.
+
+    data:
+      lv_rollname                      type rollname,
+      lv_tabkey                        type string,
+      lt_tabkey                        type stringtab,
+      lv_varnm                         type rollname,
+      lv_index                         type i,
+      lv_record                        type i,
+      lv_column                        type i,
+      lt_mtext                         type stringtab,
+      lv_mtext                         type string.
+
+    data:
+      lr_wa_tble1                      type ref to data,
+      lr_t_tble1                       type ref to data.
+
+    data:
+      lr_wa_tble2                      type ref to data,
+      lr_t_tble2                       type ref to data.
+
+    data:
+      lv_key01                         type string,
+      lv_key02                         type string,
+      lv_key03                         type string,
+      lv_key04                         type string,
+      lv_key05                         type string,
+      lv_key06                         type string,
+      lv_key07                         type string,
+      lv_key08                         type string,
+      lv_key09                         type string,
+      lv_key10                         type string,
+      lv_key11                         type string,
+      lv_key12                         type string,
+      lv_key13                         type string,
+      lv_key14                         type string,
+      lv_key15                         type string,
+      lv_key16                         type string.
+
+    field-symbols:
+      &lt;lv_val01&gt;                       type any,
+      &lt;lv_val02&gt;                       type any,
+      &lt;lv_val03&gt;                       type any,
+      &lt;lv_val04&gt;                       type any,
+      &lt;lv_val05&gt;                       type any,
+      &lt;lv_val06&gt;                       type any,
+      &lt;lv_val07&gt;                       type any,
+      &lt;lv_val08&gt;                       type any,
+      &lt;lv_val09&gt;                       type any,
+      &lt;lv_val10&gt;                       type any,
+      &lt;lv_val11&gt;                       type any,
+      &lt;lv_val12&gt;                       type any,
+      &lt;lv_val13&gt;                       type any,
+      &lt;lv_val14&gt;                       type any,
+      &lt;lv_val15&gt;                       type any,
+      &lt;lv_val16&gt;                       type any.
+
+    field-symbols:
+      &lt;lwa_table1&gt;                     type any,
+      &lt;lt_table1&gt;                      type any table,
+      &lt;lwa_table2&gt;                     type any,
+      &lt;lt_table2&gt;                      type any table,
+      &lt;lv_key&gt;                         type any.
+
+    loop at wa_param-s_tabkey into lwa_s_tabkey.
+
+      lv_tabkey = lwa_s_tabkey-low.
+      append lv_tabkey to lt_tabkey.
+
+    endloop.
+
+    create data lr_wa_tble1 type (wa_param-p_tabl1).
+    assign lr_wa_tble1-&gt;* to &lt;lwa_table1&gt;.
+
+    create data lr_t_tble1 type hashed table of (wa_param-p_tabl1) with unique key (lt_tabkey).
+    assign lr_t_tble1-&gt;* to &lt;lt_table1&gt;.
+
+    create data lr_t_tble2 type hashed table of (wa_param-p_tabl2) with unique key (lt_tabkey).
+    assign lr_t_tble2-&gt;* to &lt;lt_table2&gt;.
+
+    select *
+      into table &lt;lt_table1&gt;
+      from (wa_param-p_tabl1).
+
+    select *
+      into table &lt;lt_table2&gt;
+      from (wa_param-p_tabl2).
+
+    loop at lt_tabkey into lv_tabkey.
+
+      lv_index = sy-tabix.
+
+      lv_varnm = |lv_key{ lv_index width = 2 align = right pad = '0' }|.
+      assign (lv_varnm) to &lt;lv_key&gt;.
+      &lt;lv_key&gt; = lv_tabkey.
+
+    endloop.
+
+    clear lv_record.
+
+    "Compare table 1 against table 2.
+    loop at &lt;lt_table1&gt; assigning &lt;lwa_table1&gt;.
+
+      lv_record = lv_record + 1.
+
+      assign component lv_key01 of structure &lt;lwa_table1&gt; to &lt;lv_val01&gt;.
+      assign component lv_key02 of structure &lt;lwa_table1&gt; to &lt;lv_val02&gt;.
+      assign component lv_key03 of structure &lt;lwa_table1&gt; to &lt;lv_val03&gt;.
+      assign component lv_key04 of structure &lt;lwa_table1&gt; to &lt;lv_val04&gt;.
+      assign component lv_key05 of structure &lt;lwa_table1&gt; to &lt;lv_val05&gt;.
+      assign component lv_key06 of structure &lt;lwa_table1&gt; to &lt;lv_val06&gt;.
+      assign component lv_key07 of structure &lt;lwa_table1&gt; to &lt;lv_val07&gt;.
+      assign component lv_key08 of structure &lt;lwa_table1&gt; to &lt;lv_val08&gt;.
+      assign component lv_key09 of structure &lt;lwa_table1&gt; to &lt;lv_val09&gt;.
+      assign component lv_key10 of structure &lt;lwa_table1&gt; to &lt;lv_val10&gt;.
+      assign component lv_key11 of structure &lt;lwa_table1&gt; to &lt;lv_val11&gt;.
+      assign component lv_key12 of structure &lt;lwa_table1&gt; to &lt;lv_val12&gt;.
+      assign component lv_key13 of structure &lt;lwa_table1&gt; to &lt;lv_val13&gt;.
+      assign component lv_key14 of structure &lt;lwa_table1&gt; to &lt;lv_val14&gt;.
+      assign component lv_key15 of structure &lt;lwa_table1&gt; to &lt;lv_val15&gt;.
+      assign component lv_key16 of structure &lt;lwa_table1&gt; to &lt;lv_val16&gt;.
+
+      "Check records based on key.
+      read table &lt;lt_table2&gt; assigning &lt;lwa_table2&gt;
+        with table key
+          (lv_key01) = &lt;lv_val01&gt;
+          (lv_key02) = &lt;lv_val02&gt;
+          (lv_key03) = &lt;lv_val03&gt;
+          (lv_key04) = &lt;lv_val04&gt;
+          (lv_key05) = &lt;lv_val05&gt;
+          (lv_key06) = &lt;lv_val06&gt;
+          (lv_key07) = &lt;lv_val07&gt;
+          (lv_key08) = &lt;lv_val08&gt;
+          (lv_key09) = &lt;lv_val09&gt;
+          (lv_key10) = &lt;lv_val10&gt;
+          (lv_key11) = &lt;lv_val11&gt;
+          (lv_key12) = &lt;lv_val12&gt;
+          (lv_key13) = &lt;lv_val13&gt;
+          (lv_key14) = &lt;lv_val14&gt;
+          (lv_key15) = &lt;lv_val15&gt;
+          (lv_key16) = &lt;lv_val16&gt;.
+      if sy-subrc &lt;&gt; 0.
+
+        lv_mtext = |Record mismatch: Table 1 Record { lv_record }|.
+        append lv_mtext to lt_mtext.
+        message lv_mtext type 'S'.
+        write : / lv_mtext.
+
+        call function 'SO_STRUCT_TO_CHAR'
+          exporting
+            ip_struct = &lt;lwa_table1&gt;
+          importing
+            ep_string = lv_mtext.
+
+        append lv_mtext to lt_mtext.
+        message lv_mtext type 'S'.
+        write : / lv_mtext.
+
+      else.
+
+        if wa_param-p_fields = 'X'.
+
+          if &lt;lwa_table1&gt; &lt;&gt; &lt;lwa_table2&gt;.
+
+            if wa_param-s_fields is not initial.
+
+              loop at wa_param-s_fields into lwa_s_fields.
+
+                assign component lwa_s_fields-low of structure &lt;lwa_table1&gt; to &lt;lv_val01&gt;.
+                if sy-subrc &lt;&gt; 0.
+                  exit.
+                endif.
+
+                assign component lwa_s_fields-low of structure &lt;lwa_table2&gt; to &lt;lv_val02&gt;.
+                if sy-subrc &lt;&gt; 0.
+                  exit.
+                endif.
+
+                if &lt;lv_val01&gt; &lt;&gt; &lt;lv_val02&gt;.
+
+                  lv_mtext = |Field mismatch: Table 1 Record { lv_record }, column { lwa_s_fields-low }|.
+                  message lv_mtext type 'S'.
+                  append lv_mtext to lt_mtext.
+                  write : / lv_mtext.
+
+                  call function 'SO_STRUCT_TO_CHAR'
+                    exporting
+                      ip_struct = &lt;lwa_table1&gt;
+                    importing
+                      ep_string = lv_mtext.
+
+                  append lv_mtext to lt_mtext.
+                  message lv_mtext type 'S'.
+                  write : / lv_mtext.
+
+                endif.
+
+              endloop.
+
+            else.
+
+              do.
+
+                lv_column = sy-index.
+
+                assign component lv_column of structure &lt;lwa_table1&gt; to &lt;lv_val01&gt;.
+                if sy-subrc &lt;&gt; 0.
+                  exit.
+                endif.
+
+                assign component lv_column of structure &lt;lwa_table2&gt; to &lt;lv_val02&gt;.
+                if sy-subrc &lt;&gt; 0.
+                  exit.
+                endif.
+
+                if &lt;lv_val01&gt; &lt;&gt; &lt;lv_val02&gt;.
+
+                  lv_mtext = |Field mismatch: Table 1 Record { lv_record }, column { lv_column }|.
+                  message lv_mtext type 'S'.
+                  append lv_mtext to lt_mtext.
+                  write : / lv_mtext.
+
+                  call function 'SO_STRUCT_TO_CHAR'
+                    exporting
+                      ip_struct = &lt;lwa_table1&gt;
+                    importing
+                      ep_string = lv_mtext.
+
+                  append lv_mtext to lt_mtext.
+                  message lv_mtext type 'S'.
+                  write : / lv_mtext.
+
+                endif.
+
+              enddo.
+
+            endif.
+
+          endif.
+
+        endif.
+
+      endif.
+
+    endloop.
+
+    clear lv_record.
+
+    "Compare table 2 against table 1.
+    loop at &lt;lt_table2&gt; assigning &lt;lwa_table2&gt;.
+
+      lv_record = lv_record + 1.
+
+      assign component lv_key01 of structure &lt;lwa_table2&gt; to &lt;lv_val01&gt;.
+      assign component lv_key02 of structure &lt;lwa_table2&gt; to &lt;lv_val02&gt;.
+      assign component lv_key03 of structure &lt;lwa_table2&gt; to &lt;lv_val03&gt;.
+      assign component lv_key04 of structure &lt;lwa_table2&gt; to &lt;lv_val04&gt;.
+      assign component lv_key05 of structure &lt;lwa_table2&gt; to &lt;lv_val05&gt;.
+      assign component lv_key06 of structure &lt;lwa_table2&gt; to &lt;lv_val06&gt;.
+      assign component lv_key07 of structure &lt;lwa_table2&gt; to &lt;lv_val07&gt;.
+      assign component lv_key08 of structure &lt;lwa_table2&gt; to &lt;lv_val08&gt;.
+      assign component lv_key09 of structure &lt;lwa_table2&gt; to &lt;lv_val09&gt;.
+      assign component lv_key10 of structure &lt;lwa_table2&gt; to &lt;lv_val10&gt;.
+      assign component lv_key11 of structure &lt;lwa_table2&gt; to &lt;lv_val11&gt;.
+      assign component lv_key12 of structure &lt;lwa_table2&gt; to &lt;lv_val12&gt;.
+      assign component lv_key13 of structure &lt;lwa_table2&gt; to &lt;lv_val13&gt;.
+      assign component lv_key14 of structure &lt;lwa_table2&gt; to &lt;lv_val14&gt;.
+      assign component lv_key15 of structure &lt;lwa_table2&gt; to &lt;lv_val15&gt;.
+      assign component lv_key16 of structure &lt;lwa_table2&gt; to &lt;lv_val16&gt;.
+
+      "Check records based on key.
+      read table &lt;lt_table1&gt; assigning &lt;lwa_table1&gt;
+        with table key
+          (lv_key01) = &lt;lv_val01&gt;
+          (lv_key02) = &lt;lv_val02&gt;
+          (lv_key03) = &lt;lv_val03&gt;
+          (lv_key04) = &lt;lv_val04&gt;
+          (lv_key05) = &lt;lv_val05&gt;
+          (lv_key06) = &lt;lv_val06&gt;
+          (lv_key07) = &lt;lv_val07&gt;
+          (lv_key08) = &lt;lv_val08&gt;
+          (lv_key09) = &lt;lv_val09&gt;
+          (lv_key10) = &lt;lv_val10&gt;
+          (lv_key11) = &lt;lv_val11&gt;
+          (lv_key12) = &lt;lv_val12&gt;
+          (lv_key13) = &lt;lv_val13&gt;
+          (lv_key14) = &lt;lv_val14&gt;
+          (lv_key15) = &lt;lv_val15&gt;
+          (lv_key16) = &lt;lv_val16&gt;.
+      if sy-subrc &lt;&gt; 0.
+
+        lv_mtext = |Record mismatch: Table 2 Record { lv_record }|.
+        append lv_mtext to lt_mtext.
+        message lv_mtext type 'S'.
+        write : / lv_mtext.
+
+        call function 'SO_STRUCT_TO_CHAR'
+          exporting
+            ip_struct = &lt;lwa_table2&gt;
+          importing
+            ep_string = lv_mtext.
+
+        append lv_mtext to lt_mtext.
+        message lv_mtext type 'S'.
+        write : / lv_mtext.
+
+      endif.
+
+    endloop.
+
+    if lt_mtext is initial.
+
+      lv_mtext = |No differences found.|.
+      message lv_mtext type 'S'.
+      write : / lv_mtext.
+
+    endif.
+
+  endmethod.                    "execute
+
+endclass.                    "lcl IMPLEMENTATION
+
+load-of-program.
+
+  data:
+    lv_rollname                    type rollname.
+
+  selection-screen begin of block b1 with frame title _title_1.
+
+  parameters p_tabl1 type rollname default '/BIC/AZPM2O0400'.
+  parameters p_tabl2 type rollname default '/BIC/AZPM2O0400'.
+  select-options s_tabkey for lv_rollname no intervals.
+  select-options s_fields for lv_rollname no intervals.
+  parameters p_fields type rs_bool.
+
+  selection-screen end of block b1.
+
+initialization.
+
+  _title_1 = 'Selection'.
+
+  %_p_tabl1_%_app_%-text = 'Compare Table 1'.
+  %_p_tabl2_%_app_%-text = 'Against Table 2'.
+
+  type-pools:
+    sscr,
+    slis.
+
+  data:
+    lwa_opt_list                   type sscr_opt_list,
+    lwa_ass                        type sscr_ass,
+    lwa_restriction                type sscr_restrict.
+
+  lwa_opt_list-name       = 'EQ_ONLY'.
+  lwa_opt_list-options-eq = 'X'.
+
+  append lwa_opt_list to lwa_restriction-opt_list_tab.
+
+  do 2 times.
+    case sy-index.
+      when 1. lwa_ass-name = 'S_TABKEY'.
+      when 2. lwa_ass-name = 'S_FIELDS'.
+    endcase.
+
+    lwa_ass-kind    = 'S'.
+    lwa_ass-sg_main = 'I'.
+    lwa_ass-sg_addy = ''.
+    lwa_ass-op_main = 'EQ_ONLY'.
+
+    append lwa_ass to lwa_restriction-ass_tab.
+
+  enddo.
+
+  call function 'SELECT_OPTIONS_RESTRICT'
+    exporting
+      restriction = lwa_restriction.
+
+start-of-selection.
+
+  data:
+    lr_lcl                         type ref to lcl,
+    lwa_param                      type lcl=&gt;ty_wa_param.
+
+  "Transfer selection-screen parameters to a work area.
+  lwa_param-p_tabl1 = p_tabl1.
+  lwa_param-p_tabl2 = p_tabl2.
+  lwa_param-s_tabkey = s_tabkey[].
+  lwa_param-s_fields = s_fields[].
+  lwa_param-p_fields = p_fields.
+
+  "Create instance of class.
+  call method lcl=&gt;factory
+    exporting
+      iwa_param = lwa_param
+    importing
+      er_lcl    = lr_lcl.
+
+  "Execute class.
+  lr_lcl-&gt;execute( ).
+
+  return.
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_FIELDS         Check field differences</font>
+<font color ="#0000FF">* P_TABNM1         Compare Table 1</font>
+<font color ="#0000FF">* P_TABNM2         Against Table 2</font>
+<font color ="#0000FF">* S_FIELDS         Compare values for fields</font>
+<font color ="#0000FF">* S_TABKEY         Based on Key</font>
+
+
+<font color ="#0000FF">*Messages</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">*YPE</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

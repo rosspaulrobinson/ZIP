@@ -1,0 +1,372 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_BEX_ELEM_REFERENCES</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_BEX_ELEM_REFERENCES</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Where-used-list for BEx elements</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_BEX_ELEM_REFERENCES</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This program will show all the dependencies for a BEx element. It</font>
+<font color ="#0000FF">*&  does this by refering to the RSZELTXREF table.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_bex_elem_references.
+
+selection-screen begin of block b1 with frame title text-sel.
+
+parameters:
+  p_uid type sysuuid_25 obligatory.
+
+parameters:
+  p_compid type rszcompdir-compid.
+
+parameters:
+  p_txtlg type rszelttxt-txtlg.
+
+selection-screen end of block b1.
+
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl DEFINITION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl definition.
+
+  public section.
+
+    types:
+      begin of ty_wa_so_uid,
+        sign                       type c length 1,
+        option                     type c length 2,
+        low                        type sysuuid_25,
+        high                       type sysuuid_25,
+      end   of ty_wa_so_uid.
+
+    types:
+      ty_t_so_uid                  type table of ty_wa_so_uid with non-unique key table_line.
+
+    types:
+      begin of ty_wa_ref,
+        level                          type i,
+        t_so_uid                       type ty_t_so_uid,
+      end   of ty_wa_ref.
+
+    types:
+      ty_t_ref                         type table of ty_wa_ref  with non-unique key level.
+
+    types:
+      begin of ty_wa_output,
+        level                      type i,
+        uid                        type sysuuid_25,
+        deftp                      type rszdeftp,
+        subdeftp                   type rszsubdeftp,
+        compid                     type rszcompid,
+        txtlg                      type rstxtlg,
+      end   of ty_wa_output.
+
+    types:
+      ty_t_output                  type table of ty_wa_output with non-unique key table_line.
+
+    data:
+      ts_db_eltxref               type sorted table of rszeltxref with non-unique key teltuid,
+      th_db_eltdir                type hashed table of rszeltdir with unique key eltuid,
+      th_db_compdir               type hashed table of rszcompdir with unique key compuid,
+      th_db_elttxt                type hashed table of rszelttxt with unique key eltuid.
+
+    data:
+      t_output                    type ty_t_output.
+
+    data:
+      v_uid                        type sysuuid_25.
+
+    class-methods
+      factory
+        importing
+          iv_uid                     type sysuuid_25
+        exporting
+          er_lcl                     type ref to lcl.
+
+    methods
+      execute.
+
+    methods
+      output.
+
+endclass.                    "lcl DEFINITION
+
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl IMPLEMENTATION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl implementation.
+
+  method factory.
+
+    create object er_lcl type lcl.
+
+    "Set factory variables.
+    er_lcl-&gt;v_uid = iv_uid.
+
+  endmethod.                    "factory
+
+  method execute.
+
+    data:
+      lwa_compdir                  type rszcompdir,
+      lwa_eltxref                  type rszeltxref,
+      lwa_eltdir                   type rszeltdir,
+      lwa_elttxt                   type rszelttxt.
+
+    data:
+      lwa_so_uid                   type ty_wa_so_uid,
+      lt_so_uid_sel                type ty_t_so_uid,
+      lt_so_uid_col                type ty_t_so_uid,
+      lt_so_uid_all                type ty_t_so_uid,
+      lwa_ref                      type ty_wa_ref,
+      lt_ref                       type ty_t_ref,
+      lwa_output                   type ty_wa_output.
+
+    data:
+      lv_level                     type i.
+
+    "Retrieve query cross-reference.
+    select *
+      into table ts_db_eltxref
+      from rszeltxref
+      where objvers = 'A'.
+
+    "Retrieve element meta-data.
+    select *
+      into table th_db_eltdir
+      from rszeltdir
+      where objvers = 'A'.
+
+    "Retrieve element meta-data.
+    select *
+      into table th_db_compdir
+      from rszcompdir
+      where objvers = 'A'.
+
+    "Retrieve element meta-data.
+    select *
+      into table th_db_elttxt
+      from rszelttxt
+      where objvers = 'A' and langu = 'E'.
+
+    "Set the initial selection
+    lwa_so_uid-sign   = 'I'.
+    lwa_so_uid-option = 'EQ'.
+    lwa_so_uid-low    = v_uid.
+    append lwa_so_uid to lt_so_uid_sel.
+
+    "Collect all cross-referenced elements.
+    do 10 times.
+
+      lv_level = sy-index.
+
+      loop at ts_db_eltxref into lwa_eltxref where teltuid in lt_so_uid_sel.
+
+        lwa_so_uid-sign   = 'I'.
+        lwa_so_uid-option = 'EQ'.
+        lwa_so_uid-low    = lwa_eltxref-seltuid.
+        collect lwa_so_uid into lt_so_uid_col.
+
+      endloop.
+
+      if lt_so_uid_col is initial.
+        exit.
+      endif.
+
+      append lines of lt_so_uid_col to lt_so_uid_all.
+
+      lwa_ref-level = lv_level.
+      lwa_ref-t_so_uid = lt_so_uid_col.
+      append lwa_ref to lt_ref.
+
+      lt_so_uid_sel = lt_so_uid_col.
+      clear lt_so_uid_col.
+
+    enddo.
+
+    "Retrieve technical name and type for each element.
+    loop at lt_ref into lwa_ref.
+
+      lwa_output-level = lwa_ref-level.
+
+      loop at lwa_ref-t_so_uid into lwa_so_uid.
+
+        lwa_output-uid = lwa_so_uid-low.
+
+        read table th_db_eltdir into lwa_eltdir
+          with table key
+            eltuid = lwa_so_uid-low.
+        if sy-subrc = 0.
+
+          lwa_output-deftp    = lwa_eltdir-deftp.
+          lwa_output-subdeftp = lwa_eltdir-subdeftp.
+
+        else.
+
+          clear:
+            lwa_output-deftp,
+            lwa_output-subdeftp.
+
+        endif.
+
+        read table th_db_compdir into lwa_compdir
+          with table key
+            compuid = lwa_so_uid-low.
+        if sy-subrc = 0.
+
+          lwa_output-compid = lwa_compdir-compid.
+
+        else.
+
+          clear:
+            lwa_output-compid.
+
+        endif.
+
+        read table th_db_elttxt into lwa_elttxt
+          with table key
+            eltuid = lwa_so_uid-low.
+        if sy-subrc = 0.
+
+          lwa_output-txtlg = lwa_elttxt-txtlg.
+
+        else.
+
+          clear:
+            lwa_output-txtlg.
+
+        endif.
+
+        append lwa_output to t_output.
+
+      endloop.
+
+    endloop.
+
+    sort t_output.
+    delete adjacent duplicates from t_output.
+
+  endmethod.                    "execute
+
+  method output.
+
+    data:
+      lwa_output                   type ty_wa_output,
+      lt_output                    type ty_t_output.
+
+    data:
+      lo_table                       type ref to cl_salv_table,
+      lo_columns                     type ref to cl_salv_columns_table,
+      lo_column                      type ref to cl_salv_column,
+      lv_columnname                  type lvc_fname,
+      lo_functions                   type ref to cl_salv_functions,
+      lt_column_ref                  type salv_t_column_ref,
+      lwa_column_ref                 type salv_s_column_ref,
+      lv_text_s                      type scrtext_s,
+      lv_text_m                      type scrtext_m,
+      lv_text_l                      type scrtext_l.
+
+    data:
+      lr_data                        type ref to data.
+
+    field-symbols:
+      &lt;lt_data&gt;                      type standard table.
+
+    try.
+
+        cl_salv_table=&gt;factory( importing r_salv_table = lo_table changing t_table = t_output ).
+
+      catch cx_salv_msg.
+    endtry.
+
+    lo_functions = lo_table-&gt;get_functions( ).
+    lo_functions-&gt;set_all( abap_true ).
+
+    lo_table-&gt;display( ).
+
+  endmethod.                    "output
+
+endclass.                    "lcl IMPLEMENTATION
+
+at selection-screen output.
+
+  loop at screen.
+
+    "Disable input/output for parameters.
+    if screen-name = 'P_COMPID' or screen-name = 'P_TXTLG'.
+
+      screen-input = 0.
+      modify screen.
+
+    endif.
+
+  endloop.
+
+  clear:
+    p_compid,
+    p_txtlg.
+
+  "Retrieve technical name for element.
+  select single compid
+    into p_compid
+    from rszcompdir
+    where
+      compuid = p_uid and
+      objvers = 'A'.
+
+  "Retrieve description for element.
+  select single txtlg
+    into p_txtlg
+    from rszelttxt
+    where
+      eltuid = p_uid and
+      langu = 'E' and
+      objvers = 'A'.
+
+start-of-selection.
+
+  data:
+    lcl                            type ref to lcl.
+
+  call method lcl=&gt;factory
+    exporting
+      iv_uid = p_uid
+    importing
+      er_lcl = lcl.
+
+  call method lcl-&gt;execute( ).
+
+  call method lcl-&gt;output( ).
+
+  return.
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* SEL Select BEx Query Element</font>
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_COMPID         Technical Name</font>
+<font color ="#0000FF">* P_TXTLG         Description</font>
+<font color ="#0000FF">* P_UID         Element Unique ID</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

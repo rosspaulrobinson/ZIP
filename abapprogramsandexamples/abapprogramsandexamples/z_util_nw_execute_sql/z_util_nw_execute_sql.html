@@ -1,0 +1,188 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_NW_EXECUTE_SQL</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_NW_EXECUTE_SQL</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Execute SQL using ADBC</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_NW_EXECUTE_SQL</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This program can be used to execute native SQL via ABAP DB</font>
+<font color ="#0000FF">*&  Connectivity (ADBC), the same can be done in program RSDU_EXEC_SQL</font>
+<font color ="#0000FF">*&  but this provides an ALV output which is easier to work with.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_nw_execute_sql.
+
+load-of-program.
+
+  data:
+    lv_sql_line                      type c length 256.
+
+  data:
+    lv_sql                           type string,
+    lt_sql                           type stringtab,
+    lv_statement                     type string,
+    lo_sql_statement                 type ref to cl_sql_statement,
+    lo_sql_result_set                type ref to cl_sql_result_set,
+    lt_md_tab                        type adbc_rs_metadata_descr_tab.
+
+  data:
+    lwa_data                         type ref to data,
+    lt_data                          type ref to data,
+    lt_data_pack                     type ref to data.
+
+  data:
+    lv_ts_before                     type timestampl,
+    lv_ts_after                      type timestampl,
+    lv_ts_delta                      type timestampl.
+
+  data:
+    lo_table                         type ref to cl_salv_table,
+    lo_columns                       type ref to cl_salv_columns_table,
+    lo_column                        type ref to cl_salv_column,
+    lv_columnname                    type lvc_fname,
+    lo_functions                     type ref to cl_salv_functions,
+    lt_column_ref                    type salv_t_column_ref,
+    lwa_column_ref                   type salv_s_column_ref,
+    lv_text_s                        type scrtext_s,
+    lv_text_m                        type scrtext_m,
+    lv_text_l                        type scrtext_l.
+
+  field-symbols:
+    &lt;lwa_data&gt;                       type any,
+    &lt;lt_data&gt;                        type standard table,
+    &lt;lt_data_pack&gt;                   type standard table.
+
+  data:
+    lv_mtext                         type string.
+
+  selection-screen begin of block b1 with frame title _title_1.
+  select-options s_sql for lv_sql_line no intervals.
+  selection-screen end of block b1.
+
+initialization.
+
+  _title_1 = 'Selection'.
+
+  %_s_sql_%_app_%-text = 'SQL statement'.
+
+start-of-selection.
+
+  "Combine lines of SQL statement.
+  loop at s_sql.
+
+    lv_sql = s_sql-low.
+    lv_sql = condense( lv_sql ).
+    lv_sql = replace( val = lv_sql regex = '\t' with = '' ).
+    append lv_sql to lt_sql.
+<font color ="#0000FF">*  replace regex '\t' in s_sql-low with ''.</font>
+<font color ="#0000FF">*  lv_sql = lv_sql && ' ' && s_sql-low.</font>
+
+  endloop.
+
+  loop at lt_sql into lv_sql.
+
+    lv_statement = |{ lv_statement } { lv_sql }|.
+
+  endloop.
+
+  "Create and SQL statement object.
+  create object lo_sql_statement.
+
+  "Execute ADBC statement.
+  lo_sql_result_set = lo_sql_statement-&gt;execute_query( lv_statement ).
+
+  "Get meta-data for results.
+  lt_md_tab = lo_sql_result_set-&gt;get_metadata( ).
+
+  "Create reference data object for results.
+  lwa_data = lo_sql_result_set-&gt;get_struct_ref( lt_md_tab ).
+
+  "Create variables for results.
+  assign lwa_data-&gt;* to &lt;lwa_data&gt;.
+  create data lt_data like table of &lt;lwa_data&gt;.
+  assign lt_data-&gt;* to &lt;lt_data&gt;.
+
+  create data lt_data_pack like table of &lt;lwa_data&gt;.
+  assign lt_data_pack-&gt;* to &lt;lt_data_pack&gt;.
+
+  "Set variable for results.
+  lo_sql_result_set-&gt;set_param_table( lt_data_pack ).
+
+  get time stamp field lv_ts_before.
+
+  "Retrieve results.
+  do.
+
+    clear &lt;lt_data_pack&gt;.
+
+    lo_sql_result_set-&gt;next_package( 100 ).
+
+    if &lt;lt_data_pack&gt; is initial.
+
+      lo_sql_result_set-&gt;close( ).
+      exit.
+
+    endif.
+
+    append lines of &lt;lt_data_pack&gt; to &lt;lt_data&gt;.
+
+  enddo.
+
+  get time stamp field lv_ts_after.
+
+  lv_ts_delta = lv_ts_after - lv_ts_before.
+
+  try.
+
+      cl_salv_table=&gt;factory( importing r_salv_table = lo_table changing t_table = &lt;lt_data&gt; ).
+
+    catch cx_salv_msg.
+  endtry.
+
+  lo_functions = lo_table-&gt;get_functions( ).
+  lo_functions-&gt;set_all( abap_true ).
+
+  lo_columns = lo_table-&gt;get_columns( ).
+  lo_columns-&gt;set_optimize( rs_c_true ).
+
+  lt_column_ref = lo_columns-&gt;get( ).
+
+  loop at lt_column_ref into lwa_column_ref.
+
+    lo_column = lo_columns-&gt;get_column( lwa_column_ref-columnname ).
+
+    lv_text_l = lwa_column_ref-columnname.
+    lo_column-&gt;set_short_text( '' ).
+    lo_column-&gt;set_medium_text( '' ).
+    lo_column-&gt;set_long_text( lv_text_l ).
+
+  endloop.
+
+  lv_mtext = |{ lines( &lt;lt_data&gt; ) } records retrieved by SQL in { lv_ts_delta } seconds|.
+
+  message lv_mtext type 'S'.
+
+  lo_table-&gt;display( ).
+
+  return.
+
+
+<font color ="#0000FF">*Messages</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">*YPE</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

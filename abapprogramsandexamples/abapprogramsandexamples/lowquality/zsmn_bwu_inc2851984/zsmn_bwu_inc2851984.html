@@ -1,0 +1,71 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>ZSMN_BWU_INC2851984</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: ZSMN_BWU_INC2851984</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Delete DSO data before change</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  ZSMN_BWU_INC2851984</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*& Program to be run as an XPRA object to delete DSO before change.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report zsmn_bwu_inc2851984.
+
+data:
+  lv_odsobject                     type rsdodsobject ,
+  lr_odso                          type ref to cl_rsd_odso.
+
+do 3 times.
+
+  case sy-index.
+    when 1.
+      lv_odsobject = 'ZPA1O04'.
+    when 2.
+      lv_odsobject = 'ZPA1O05'.
+    when 3.
+      lv_odsobject = 'ZPA1O06'.
+  endcase.
+
+  call method cl_rsd_odso=&gt;factory
+    exporting
+      i_odsobject   = lv_odsobject
+    receiving
+      r_r_odso      = lr_odso
+    exceptions
+      input_invalid = 1
+      cancelled     = 2
+      others        = 3.
+  if sy-subrc = 0.
+
+    call method lr_odso-&gt;if_rsd_dta~delete_data
+      exporting
+        i_with_dialog   = rs_c_false
+        i_with_activate = rs_c_true
+        i_incl_dime     = rs_c_true
+        i_force_new_log = rs_c_false
+      exceptions
+        cancelled       = 1
+        not_found       = 2
+        failed          = 3
+        dta_used        = 4
+        not_authorized  = 5
+        others          = 6.
+
+  endif.
+
+enddo.
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

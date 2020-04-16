@@ -1,0 +1,746 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_NW_EXPORT_DATA_TO_FILE</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_NW_EXPORT_DATA_TO_FILE</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Read table data via RFC and export as XML, CSV and/or JSON</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_NW_EXPORT_DATA_TO_FILE</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_nw_export_data_to_file.
+
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl DEFINITION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl definition.
+
+  public section.
+
+    types:
+      ty_v_where                   type c length 255.
+
+    types:
+      begin of ty_wa_param,
+        p_tabnm                    type dd03l-tabname,
+        s_fldnm                    type range of fieldname,
+        s_where                    type range of ty_v_where,
+        p_rdest                    type rfcdest,
+        p_psize                    type i,
+        p_packs                    type i,
+        p_lcdir                    type string,
+        p_xml                      type rs_bool,
+        p_csv                      type rs_bool,
+        p_json                     type rs_bool,
+      end of ty_wa_param.
+
+    types:
+      begin of ty_wa_ddic,
+        fieldname                  type fieldname,
+        position                   type tabfdpos,
+        inttype                    type inttype,
+        intlen                     type intlen,
+        decimals                   type decimals,
+      end of ty_wa_ddic,
+      ty_t_ddic                    type table of ty_wa_ddic with non-unique key table_line.
+
+    class-methods factory
+      importing
+        iwa_param type ty_wa_param
+      exporting
+        er_lcl    type ref to lcl.
+
+    methods execute.
+
+  private section.
+
+    data:
+      wa_param                     type ty_wa_param.
+
+    methods get_ddic_via_rfc
+      returning
+        value(rt_ddic) type ty_t_ddic.
+
+    methods rtts_create_itab
+      importing
+        it_ddic type ty_t_ddic
+      exporting
+        er_t_data type ref to data.
+
+    methods rtts_create_comp
+      importing
+        iwa_ddic type ty_wa_ddic
+      returning
+        value(rr_data) type ref to data .
+
+    methods save_data
+      changing
+        cr_t_data type ref to data.
+
+    methods export_xml
+      importing
+        iv_fpath type string
+        iv_xml type string.
+
+    methods export_csv
+      importing
+        ir_t_data type ref to data
+        iv_fpath type string.
+
+    methods export_json
+      importing
+        ir_t_data type ref to data
+        iv_fpath type string.
+
+endclass.                    "lcl DEFINITION
+
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl IMPLEMENTATION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl implementation.
+
+  method factory.
+
+    create object er_lcl.
+
+    er_lcl-&gt;wa_param = iwa_param.
+
+  endmethod.                    "factory
+
+  method execute.
+
+    data:
+      lt_ddic                      type ty_t_ddic,
+      lr_t_data                    type ref to data.
+
+    "Get table meta-data from the data dictionary via RFC table read.
+    call method get_ddic_via_rfc
+      receiving
+        rt_ddic = lt_ddic.
+
+    "Check the defintion was returned.
+    check lt_ddic is not initial.
+
+    "Create an internal table to hold the data retrieved via RFC.
+    call method rtts_create_itab
+      exporting
+        it_ddic   = lt_ddic
+      importing
+        er_t_data = lr_t_data.
+
+    "Retrieve and save the data.
+    call method save_data
+      changing
+        cr_t_data = lr_t_data.
+
+  endmethod.                    "execute
+
+  method get_ddic_via_rfc.
+
+    data:
+      lwa_options                  type rfc_db_opt,
+      lt_options                   type table of rfc_db_opt,
+      lwa_fields                   type rfc_db_fld,
+      lt_fields                    type table of rfc_db_fld,
+      lwa_rfcdata                  type tab512,
+      lt_rfcdata                   type table of tab512.
+
+    data:
+      lwa_dd03l                    type dd03l,
+      lt_dd03l                     type table of dd03l.
+
+    data:
+      lv_csv_dd03l_fields          type string,
+      lt_csv_dd03l_fields          type stringtab.
+
+    data:
+      lwa_ddic                     type ty_wa_ddic,
+      lt_ddic                      type ty_t_ddic.
+
+    "Set the table name.
+    lwa_options-text = |TABNAME = '{ wa_param-p_tabnm }' AND|.
+    append lwa_options to lt_options.
+
+    "Set the object version.
+    lwa_options-text = |AS4LOCAL = 'A' AND|.
+    append lwa_options to lt_options.
+
+    "Set the options to exclude exclude append structure definitions.
+    lwa_options-text = |( COMPTYPE = 'E' OR COMPTYPE = '' )|.
+    append lwa_options to lt_options.
+
+    "Set DDIC fields to read.
+    lv_csv_dd03l_fields =
+      |FIELDNAME,0,30,C;| &&
+      |POSITION,30,4,N;| &&
+      |INTTYPE,35,1,C;| &&
+      |INTLEN,36,6,C;| &&
+      |DECIMALS,48,6,N|.
+
+    "Convert CSV data for fields.
+    split lv_csv_dd03l_fields at ';' into table lt_csv_dd03l_fields.
+
+    loop at lt_csv_dd03l_fields into lv_csv_dd03l_fields.
+
+      split lv_csv_dd03l_fields at ','
+        into
+          lwa_fields-fieldname
+          lwa_fields-offset
+          lwa_fields-length
+          lwa_fields-type.
+
+      append lwa_fields to lt_fields.
+
+    endloop.
+
+    "Retrieve the DDIC information for the table.
+    call function 'RFC_READ_TABLE' destination wa_param-p_rdest
+      exporting
+        query_table          = 'DD03L'
+        delimiter            = ','
+      tables
+        options              = lt_options
+        fields               = lt_fields
+        data                 = lt_rfcdata
+      exceptions
+        table_not_available  = 1
+        table_without_data   = 2
+        option_not_valid     = 3
+        field_not_valid      = 4
+        not_authorized       = 5
+        data_buffer_exceeded = 6
+        others               = 7.
+    if sy-subrc &lt;&gt; 0.
+      return.
+    endif.
+
+    "Convert CSV data for fields.
+    loop at lt_rfcdata into lwa_rfcdata.
+
+      split lwa_rfcdata
+        at ','
+        into
+          lwa_ddic-fieldname
+          lwa_ddic-position
+          lwa_ddic-inttype
+          lwa_ddic-intlen
+          lwa_ddic-decimals.
+
+      "Retain only the required fields.
+      read table wa_param-s_fldnm transporting no fields
+        with key
+          low = lwa_ddic-fieldname.
+      if sy-subrc = 0.
+        append lwa_ddic to lt_ddic.
+      endif.
+
+    endloop.
+
+    "Sort by field position.
+    sort lt_ddic by position ascending.
+
+    rt_ddic = lt_ddic.
+
+  endmethod.                    "get_ddic_via_rfc
+
+  method rtts_create_comp.
+
+    data:
+      itp                          type inttype,
+      iln                          type intlen,
+      dec                          type decimals.
+
+    "Copy work area values to local variables.
+    itp = iwa_ddic-inttype.
+    iln = iwa_ddic-intlen.
+    dec = iwa_ddic-decimals.
+
+    "Create reference data object.
+    case itp.
+      when 'g'.
+        create data rr_data type string.
+      when 'y'.
+        create data rr_data type xstring.
+      when 'I' or 'X' or 's'.
+        create data rr_data type i.
+      when 'D' or 'T' or 'F'.
+        create data rr_data type (itp).
+      when 'P'.
+        create data rr_data type p length iln decimals dec.
+      when others.
+        create data rr_data type (itp) length iln.
+    endcase.
+
+  endmethod.                    "rtts_create_comp
+
+  method rtts_create_itab.
+
+    data:
+      lwa_ddic                     type ty_wa_ddic,
+      lr_data                      type ref to data,
+      lr_wa_data                   type ref to data,
+      lr_t_data                    type ref to data.
+
+    data:
+      lo_typedescr                 type ref to cl_abap_typedescr,
+      lo_structdescr               type ref to cl_abap_structdescr,
+      lwa_component                type abap_componentdescr,
+      lt_component                 type abap_component_tab.
+
+    field-symbols:
+      &lt;lv_comp&gt;                    type any,
+      &lt;lwa_data&gt;                   type any,
+      &lt;lt_data&gt;                    type standard table.
+
+    data:
+      lo_root                      type ref to cx_root.
+
+    loop at it_ddic into lwa_ddic.
+
+      "Create reference based on DDIC meta-data for component.
+      lr_data = rtts_create_comp( lwa_ddic ).
+
+      "Create a run-time type description for the component.
+      call method cl_abap_typedescr=&gt;describe_by_data_ref
+        exporting
+          p_data_ref  = lr_data
+        receiving
+          p_descr_ref = lo_typedescr.
+
+      "Add the component definition to the component list.
+      lwa_component-name = lwa_ddic-fieldname.
+      lwa_component-type ?= lo_typedescr.
+      append lwa_component to lt_component.
+
+    endloop.
+
+    "Create a structure definition based on the field definitions.
+    try.
+
+        call method cl_abap_structdescr=&gt;create
+          exporting
+            p_components = lt_component
+          receiving
+            p_result     = lo_structdescr.
+
+      catch cx_sy_struct_creation into lo_root.
+
+        lo_root-&gt;get_longtext( ).
+
+        return.
+
+    endtry.
+
+    "Create a structure data object based on the structure definition.
+    create data lr_wa_data type handle lo_structdescr.
+    assign lr_wa_data-&gt;* to &lt;lwa_data&gt;.
+
+    "Create a table data object based on the structure definition.
+    create data lr_t_data like table of &lt;lwa_data&gt;.
+    assign lr_t_data-&gt;* to &lt;lt_data&gt;.
+
+    er_t_data = lr_t_data.
+
+  endmethod.                    "rtts_create_itab
+
+  method save_data.
+
+    data:
+      lt_so_fldnm                  type range of fieldname,
+      lwa_so_fldnm                 like line of lt_so_fldnm.
+
+    data:
+      lt_so_where                  type range of ty_v_where,
+      lwa_so_where                 like line of lt_so_where.
+
+    data:
+      lv_fpath                     type string.
+
+    data:
+      lv_select                    type string,
+      lv_from                      type string,
+      lv_where                     type string.
+
+    data:
+      lv_xml                       type string,
+      lt_xml                       type stringtab.
+
+    field-symbols:
+      &lt;lv_data&gt;                    type any,
+      &lt;lwa_data&gt;                   type any,
+      &lt;lt_data&gt;                    type standard table.
+
+    check ( wa_param-p_xml  = rs_c_true or
+            wa_param-p_csv  = rs_c_true or
+            wa_param-p_json = rs_c_true ).
+
+    "Convert the field list into an SQL projection string.
+    loop at wa_param-s_fldnm into lwa_so_fldnm.
+
+      lv_select = |{ lv_select } { lwa_so_fldnm-low }|.
+
+    endloop.
+
+    "Convert the where list into an SQL where clause.
+    loop at wa_param-s_where into lwa_so_where.
+
+      lv_where = |{ lv_where } { lwa_so_where-low }|.
+
+    endloop.
+
+    "Convert the table name to an SQL from string.
+    lv_from = wa_param-p_tabnm.
+
+    "Initialise data retrieval.
+    call function <a href ="zxun_bwu_ixml_init/zxun_bwu_ixml_init.html">'ZXUN_BWU_IXML_INIT'</a>destination wa_param-p_rdest
+      exporting
+        iv_select   = lv_select
+        iv_from     = lv_from
+        iv_where    = lv_where
+        iv_packsize = wa_param-p_psize
+        iv_packages = wa_param-p_packs
+      exceptions
+        setup_error = 1
+        others      = 2.
+    if sy-subrc &lt;&gt; 0.
+      return.
+    endif.
+
+    do.
+
+      clear:
+        lv_xml,
+        lt_xml.
+
+      "Dervie the file path prefix.
+      lv_fpath =
+        |{ wa_param-p_lcdir }{ wa_param-p_tabnm }\\{ wa_param-p_tabnm }_| &&
+        |{ sy-index width = 3 align = right pad = '0' }|.
+
+      "Retrieve data in XML format.
+      call function <a href ="zxun_bwu_ixml_data/zxun_bwu_ixml_data.html">'ZXUN_BWU_IXML_DATA'</a>destination wa_param-p_rdest
+        importing
+          ev_xml       = lv_xml
+        exceptions
+          no_more_data = 1
+          others       = 2.
+      if sy-subrc &lt;&gt; 0.
+        exit.
+      endif.
+
+      "If export to XML format is required.
+      if wa_param-p_xml = rs_c_true.
+
+        export_xml( iv_fpath = lv_fpath iv_xml = lv_xml ).
+
+      endif. "If export to XML format is required.
+
+      "The export of CSV and JSON both require an internal table.
+      if ( wa_param-p_csv = rs_c_true or wa_param-p_json = rs_c_true ).
+
+        assign cr_t_data-&gt;* to &lt;lt_data&gt;.
+
+        "Convert the XML string to an internal table.
+        call transformation id
+          source xml lv_xml
+          result tab = &lt;lt_data&gt;.
+
+        "If export to CSV format is required.
+        if wa_param-p_csv = rs_c_true.
+
+          export_csv( ir_t_data = cr_t_data iv_fpath = lv_fpath ).
+
+        endif. "If export to CSV format is required.
+
+        if wa_param-p_json = rs_c_true.
+
+          export_json( ir_t_data = cr_t_data iv_fpath = lv_fpath ).
+
+        endif.
+
+      endif.
+
+    enddo.
+
+  endmethod.                    "save_data
+
+  method export_xml.
+
+    data:
+      lt_xml                       type stringtab.
+
+    append iv_xml to lt_xml.
+
+    call method cl_gui_frontend_services=&gt;gui_download
+      exporting
+        filename      = |{ iv_fpath }.xml|
+      changing
+        data_tab      = lt_xml
+      exceptions
+        access_denied = 1.
+
+  endmethod.                    "export_xml
+
+  method export_csv.
+
+    data:
+      lt_so_fldnm                  type range of fieldname,
+      lwa_so_fldnm                 like line of lt_so_fldnm.
+
+    data:
+      lv_csv                       type string,
+      lt_csv                       type stringtab,
+      lv_len                       type i.
+
+    field-symbols:
+      &lt;lv_data&gt;                    type any,
+      &lt;lwa_data&gt;                   type any,
+      &lt;lt_data&gt;                    type standard table.
+
+    "Assign reference data object to field symbol.
+    assign ir_t_data-&gt;* to &lt;lt_data&gt;.
+
+    loop at &lt;lt_data&gt; assigning &lt;lwa_data&gt;.
+
+      if sy-tabix = 1.
+
+        loop at wa_param-s_fldnm into lwa_so_fldnm.
+
+          lv_csv = |{ lv_csv }{ lwa_so_fldnm-low },|.
+
+        endloop.
+
+        "Determine the length of the string to retain.
+        lv_len = strlen( lv_csv ) - 1.
+
+        "Remove the last character.
+        lv_csv = lv_csv(lv_len).
+
+        "Append the CSV header to the CSV data.
+        append lv_csv to lt_csv.
+
+        clear lv_csv.
+
+      endif.
+
+      do.
+
+        assign component sy-index of structure &lt;lwa_data&gt; to &lt;lv_data&gt;.
+        if sy-subrc &lt;&gt; 0.
+
+          "Determine the length of the string to retain.
+          lv_len = strlen( lv_csv ) - 1.
+
+          "Remove the last character.
+          lv_csv = lv_csv(lv_len).
+
+          "Append the CSV line to the CSV data.
+          append lv_csv to lt_csv.
+
+          clear lv_csv.
+
+          exit.
+
+        endif.
+
+        lv_csv = |{ lv_csv }{ &lt;lv_data&gt; },|.
+
+      enddo.
+
+    endloop.
+
+    call method cl_gui_frontend_services=&gt;gui_download
+      exporting
+        filename      = |{ iv_fpath }.csv|
+      changing
+        data_tab      = lt_csv
+      exceptions
+        access_denied = 1.
+
+  endmethod.                    "export_csv
+
+  method export_json.
+
+    data:
+      lo_writer                    type ref to cl_sxml_string_writer,
+      lv_output_length             type i,
+      lt_binary_tab                type standard table of sdokcntbin,
+      lv_jsonx                     type xstring,
+      lv_json                      type string,
+      lt_json                      type stringtab.
+
+    field-symbols:
+      &lt;lt_data&gt;                    type standard table.
+
+    "Assign reference data object to field symbol.
+    assign ir_t_data-&gt;* to &lt;lt_data&gt;.
+
+    "Instantiate write class.
+    call method cl_sxml_string_writer=&gt;create
+      exporting
+        type   = if_sxml=&gt;co_xt_json
+      receiving
+        writer = lo_writer.
+
+    "Convert the XML string to an internal table.
+    call transformation id
+      source text = &lt;lt_data&gt;
+      result xml lo_writer.
+
+    lv_jsonx = lo_writer-&gt;get_output( ).
+
+    call function 'SCMS_XSTRING_TO_BINARY'
+      exporting
+        buffer        = lv_jsonx
+      importing
+        output_length = lv_output_length
+      tables
+        binary_tab    = lt_binary_tab.
+
+    call function 'SCMS_BINARY_TO_STRING'
+      exporting
+        input_length  = lv_output_length
+      importing
+        text_buffer   = lv_json
+        output_length = lv_output_length
+      tables
+        binary_tab    = lt_binary_tab.
+
+    append lv_json to lt_json.
+
+    call method cl_gui_frontend_services=&gt;gui_download
+      exporting
+        filename      = |{ iv_fpath }.json|
+      changing
+        data_tab      = lt_json
+      exceptions
+        access_denied = 1.
+
+  endmethod.                    "export_json
+
+endclass.                    "lcl IMPLEMENTATION
+
+load-of-program.
+
+  data:
+    v_fldnm                        type fieldname,
+    v_where                        type lcl=&gt;ty_v_where.
+
+  parameters p_tabnm type fieldname obligatory.
+
+  select-options s_fldnm for v_fldnm obligatory no intervals.
+
+  select-options s_where for v_where no intervals.
+
+  parameters p_rdest type rfcdest default 'DECCLNT200'.
+
+  parameters p_psize type i default 5000.
+  parameters p_packs type i default 1.
+
+  parameters p_lcdir type string default 'C:\data\DEC\' lower case.
+
+  selection-screen begin of block b1 with frame title text-exp.
+
+  parameters p_xml type rs_bool.
+  parameters p_csv type rs_bool.
+  parameters p_json type rs_bool.
+
+  selection-screen end of block b1.
+
+initialization.
+
+  type-pools:
+    sscr,
+    slis.
+
+  data:
+    lwa_opt_list                   type sscr_opt_list,
+    lwa_ass                        type sscr_ass,
+    lwa_restriction                type sscr_restrict.
+
+  lwa_opt_list-name       = 'EQ_ONLY'.
+  lwa_opt_list-options-eq = 'X'.
+
+  append lwa_opt_list to lwa_restriction-opt_list_tab.
+
+  do 2 times.
+    case sy-index.
+      when 1. lwa_ass-name = 'S_FLDNM'.
+      when 2. lwa_ass-name = 'S_WHERE'.
+    endcase.
+
+    lwa_ass-kind    = 'S'.
+    lwa_ass-sg_main = 'I'.
+    lwa_ass-sg_addy = ''.
+    lwa_ass-op_main = 'EQ_ONLY'.
+
+    append lwa_ass to lwa_restriction-ass_tab.
+
+  enddo.
+
+  call function 'SELECT_OPTIONS_RESTRICT'
+    exporting
+      restriction = lwa_restriction.
+
+start-of-selection.
+
+  data:
+    lr_lcl                         type ref to lcl,
+    lwa_param                      type lcl=&gt;ty_wa_param.
+
+  "Transfer selection-screen parameters to a work area.
+  lwa_param-p_tabnm = p_tabnm.
+  lwa_param-s_fldnm = s_fldnm[].
+  lwa_param-s_where = s_where[].
+  lwa_param-p_rdest = p_rdest.
+  lwa_param-p_psize = p_psize.
+  lwa_param-p_packs = p_packs.
+  lwa_param-p_lcdir = p_lcdir.
+  lwa_param-p_xml   = p_xml.
+  lwa_param-p_csv   = p_csv.
+  lwa_param-p_json  = p_json.
+
+  call method lcl=&gt;factory
+    exporting
+      iwa_param = lwa_param
+    importing
+      er_lcl    = lr_lcl.
+
+  lr_lcl-&gt;execute( ).
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* EXP Export formats</font>
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_CSV         CSV</font>
+<font color ="#0000FF">* P_JSON         JSON</font>
+<font color ="#0000FF">* P_LCDIR         Directory</font>
+<font color ="#0000FF">* P_PACKS         Number of packages</font>
+<font color ="#0000FF">* P_PSIZE         Package/file size</font>
+<font color ="#0000FF">* P_RDEST D       .</font>
+<font color ="#0000FF">* P_TABNM         Table</font>
+<font color ="#0000FF">* P_XML         XML</font>
+<font color ="#0000FF">* S_FLDNM         Fields</font>
+<font color ="#0000FF">* S_WHERE         Where</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

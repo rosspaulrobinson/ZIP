@@ -1,0 +1,119 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_NW_XML_READ_AND_EXPORT</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_NW_XML_READ_AND_EXPORT</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Read from DB and Export XML files</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_NW_XML_READ_AND_EXPORT</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  Internal table data is encoded as XML and stored on the ApplServer.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  Does not use RFC.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_nw_xml_read_and_export.
+
+data:
+  lv_cursor                        type cursor.
+
+data:
+  lv_pack                          type string,
+  lv_dset                          type string.
+
+data:
+  lv_xml                           type string,
+  lr_data                          type ref to data.
+
+field-symbols:
+  &lt;lt_data&gt;                        type standard table.
+
+selection-screen begin of block b01 with frame title text-b01.
+
+parameters p_tabl type string default '' obligatory.
+parameters p_pksz type i default '10000' obligatory.
+
+selection-screen end of block b01.
+
+selection-screen begin of block b02 with frame title text-b02.
+
+parameters p_path type string default '/usr/sap/trans/Temp/DEV/DRA/' lower case.
+parameters p_file type string default '' obligatory.
+
+selection-screen end of block b02.
+
+start-of-selection.
+
+  "Open cursor for DB read.
+  open cursor with hold lv_cursor for
+    select *
+      from (p_tabl).
+
+  do.
+
+    "Store package number.
+    lv_pack = |{ sy-index width = 3 align = right pad = '0' }|.
+
+    "Create internal table.
+    create data lr_data type table of (p_tabl).
+    assign lr_data-&gt;* to &lt;lt_data&gt;.
+
+    "Retrieve data from DB.
+    fetch next cursor lv_cursor
+      into table &lt;lt_data&gt;
+      package size p_pksz.
+    if sy-subrc &lt;&gt; 0.
+
+      close cursor lv_cursor.
+      exit.
+
+    endif.
+
+    "Convert internal table to XML.
+    call transformation id
+      source tab = &lt;lt_data&gt;
+      result xml lv_xml.
+
+    "Set file directory, name and extension.
+    lv_dset = |{ p_path }{ p_file }_{ lv_pack }.txt|.
+
+    "Open file.
+    open dataset lv_dset for output in text mode encoding default.
+    if sy-subrc &lt;&gt; 0.
+      exit.
+    endif.
+
+    "Write to file.
+    transfer lv_xml to lv_dset.
+
+    "Close file.
+    close dataset lv_dset.
+
+  enddo.
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* B01 Read from</font>
+<font color ="#0000FF">* B02 Export to</font>
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_FILE         Filename</font>
+<font color ="#0000FF">* P_PATH         Directory on Appl. Server</font>
+<font color ="#0000FF">* P_PKSZ         Package size</font>
+<font color ="#0000FF">* P_TABL         DB table to read from</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

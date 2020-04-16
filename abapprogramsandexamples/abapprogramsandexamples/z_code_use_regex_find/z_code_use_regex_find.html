@@ -1,0 +1,47 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_CODE_USE_REGEX_FIND</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_CODE_USE_REGEX_FIND</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Demo of how to use regular expression in find key word</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_CODE_USE_REGEX_FIND</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_code_use_regex_find.
+
+
+data:
+  lv_regex type string,
+  lv_string type string,
+  lwa_result type match_result,
+  lt_result type match_result_tab.
+
+lv_regex = '(/BIC/|/BI0/)(M|P|Q|T)\w{1,24}'.
+lv_string = '/BIC/PXXX /BIC/Q1234 /BI0/MXXX'.
+
+find all occurrences of regex lv_regex in lv_string results lt_result.
+
+
+lv_regex = '(A|B|C|D)'.
+lv_string = '/BIC/PXXX /BIC/Q1234 /BI0/MXXX'.
+
+find all occurrences of regex lv_regex in lv_string results lt_result.
+replace all OCCURRENCES OF regex lv_regex in lv_string with ` `.
+
+return.
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

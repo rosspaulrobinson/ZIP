@@ -1,0 +1,757 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_NW_RFC_READ_AND_EXPORT</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_NW_RFC_READ_AND_EXPORT</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Read from DB table and Export ZIP files via RFC_TABLE_READ.</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_NW_RFC_READ_AND_EXPORT</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This program is paired with Z_UTIL_NW_RFC_IMPORT_AND_WRITE, used</font>
+<font color ="#0000FF">*&  together these program support reading data, exporting it to a</font>
+<font color ="#0000FF">*&  file, subsequentially importing the data and writing it to a table.</font>
+<font color ="#0000FF">*&  This can be very useful for unit testing as it can support the</font>
+<font color ="#0000FF">*&  transfer of data between system.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  The code uses the RFC_READ_TABLE function module to read the table</font>
+<font color ="#0000FF">*&  and the table meta-data from either the local or remote system,</font>
+<font color ="#0000FF">*&  although this is a very inefficient way to read the data it does</font>
+<font color ="#0000FF">*&  mean the code is not dependent on custom code.</font>
+<font color ="#0000FF">*&  Note that the code is intentionally not be modularised into</font>
+<font color ="#0000FF">*&  methods, this is so that the code is suitable for re-use in</font>
+<font color ="#0000FF">*&  Include programs or other re-use scenarios.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  The code is kept to a max line length of 73 characters.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_nw_rfc_read_and_export.
+
+load-of-program.
+
+  selection-screen begin of block dir with frame title _title_1.
+
+  parameters p_dircty type string lower case obligatory.
+  parameters p_filenm type string lower case obligatory.
+  parameters p_filety type string lower case obligatory.
+
+  selection-screen end of block dir.
+
+  selection-screen begin of block tab with frame title _title_2.
+
+  parameters p_rfcdst type rfcdest obligatory.
+  parameters p_tablnm type tabname obligatory.
+  parameters p_fldsel type string  obligatory.
+  parameters p_option type string  obligatory.
+
+  selection-screen end of block tab.
+
+  selection-screen begin of block seg with frame title _title_3.
+
+  parameters p_mxrows type so_int obligatory.
+  parameters p_packsz type so_int obligatory.
+
+  selection-screen end of block seg.
+
+initialization.
+
+  "Set block texts.
+  _title_1 = 'Target directory'.
+  _title_2 = 'Table parameters'.
+  _title_3 = 'Data retrieval'.
+
+  "Set parameter texts.
+  %_p_dircty_%_app_%-text = 'Directory on server'.
+  %_p_filenm_%_app_%-text = 'File name'.
+  %_p_filety_%_app_%-text = 'File extension'.
+
+  %_p_rfcdst_%_app_%-text = 'Remote system'.
+  %_p_tablnm_%_app_%-text = 'Read from source table'.
+  %_p_fldsel_%_app_%-text = 'Fields selected (Pipe delimit)'.
+  %_p_option_%_app_%-text = 'Options (Where clause)'.
+
+  %_p_mxrows_%_app_%-text = 'Maximum rows retrieved'.
+  %_p_packsz_%_app_%-text = 'Rows in each file'.
+
+  "Set parameter defaults.
+  p_dircty = '/usr/sap/trans/Temp/DEV/DRA/'.
+  p_filenm = 'RFC_TADIR'.
+  p_filety = '.bin'.
+
+  p_rfcdst = 'DECCLNT200'.
+  p_tablnm = 'TADIR'.
+  p_fldsel = 'OBJECT|OBJ_NAME|KORRNUM'.
+  p_option = |AUTHOR = '{ sy-uname }' and OBJECT = 'PROG'|.
+
+  p_mxrows = 50000.
+  p_packsz = 50000.
+
+start-of-selection.
+
+  types:
+    begin of ty_wa_param,
+      p_dircty                     type string,
+      p_filenm                     type string,
+      p_filety                     type string,
+      p_rfcdst                     type rfcdest,
+      p_tablnm                     type tabname,
+      p_fldsel                     type string,
+      p_option                     type string,
+      p_mxrows                     type so_int,
+      p_packsz                     type so_int,
+    end of ty_wa_param.
+
+  types:
+    ty_wa_dd03l                    type dd03l,
+    ty_t_dd03l                     type table of dd03l.
+
+  types:
+    begin of ty_wa_conv_error,
+      comp                         type rollname,
+      line                         type string,
+    end of ty_wa_conv_error,
+    ty_t_conv_error                type table of ty_wa_conv_error
+                                        with non-unique key table line.
+
+  data:
+    lwa_param                      type ty_wa_param,
+    lv_delimiter                   type c,
+    lwa_dd03l_options              type rfc_db_opt,
+    lwa_options                    type rfc_db_opt,
+    lt_dd03l_options               type table of rfc_db_opt,
+    lt_options                     type table of rfc_db_opt,
+    lwa_fields                     type rfc_db_fld,
+    lt_dd03l_fields                type table of rfc_db_fld,
+    lt_fields                      type table of rfc_db_fld,
+    lwa_dd03l_rfcdata              type tab512,
+    lt_dd03l_rfcdata               type table of tab512,
+    lwa_dd03l                      type ty_wa_dd03l,
+    lt_dd03l                       type ty_t_dd03l,
+    lwa_rfcdata                    type tab512,
+    lt_rfcdata                     type table of tab512,
+    lv_splitdata                   type string,
+    lt_splitdata                   type stringtab,
+    lv_index                       type i,
+    lv_row_length                  type i,
+    lv_index_to                    type i,
+    lv_segment_nr                  type i,
+    lv_segment_id                  type c length 3,
+    lt_fields_selected             type stringtab,
+    lv_option                      type string,
+    lt_option                      type stringtab.
+
+  data:
+    lv_csv_dd03l_fields            type string,
+    lt_csv_dd03l_fields            type stringtab.
+
+  data:
+    lr_data                        type ref to data,
+    lwa_data                       type ref to data,
+    lt_data                        type ref to data,
+    lt_data_segment                type ref to data,
+    lt_data_segments               type ref to data.
+
+  data:
+    lo_typedescr                   type ref to cl_abap_typedescr,
+    lo_structdescr                 type ref to cl_abap_structdescr,
+    lwa_component                  type abap_componentdescr,
+    lt_component                   type abap_component_tab.
+
+  field-symbols:
+    &lt;lv_comp&gt;                      type any,
+    &lt;lwa_data&gt;                     type any,
+    &lt;lt_data&gt;                      type standard table,
+    &lt;lt_data_segment&gt;              type standard table,
+    &lt;lt_data_segments&gt;             type standard table,
+    &lt;lv_param&gt;                     type any.
+
+  data:
+    lv_xml                         type string,
+    lv_xml_zip                     type string,
+    lv_str                         type string,
+    lv_xstr                        type xstring,
+    lv_xstr_zip                    type xstring,
+    lo_zip                         type ref to cl_abap_zip.
+
+  data:
+    lv_filepath                    type string.
+
+  data:
+    lt_tadir_base                  type table of tadir,
+    lt_tadir_comp                  type table of tadir.
+
+  data:
+    lwa_conv_error                 type ty_wa_conv_error,
+    lt_conv_error                  type ty_t_conv_error,
+    lo_root                        type ref to cx_root.
+
+  "Dynamically copy the parameters to local variables.
+  if &lt;lv_param&gt; is not assigned.
+
+    assign ('P_DIRCTY') to &lt;lv_param&gt;.
+    if sy-subrc = 0.
+      lwa_param-p_dircty = &lt;lv_param&gt;.
+    endif.
+
+    assign ('P_FILENM') to &lt;lv_param&gt;.
+    if sy-subrc = 0.
+      lwa_param-p_filenm = &lt;lv_param&gt;.
+    endif.
+
+    assign ('P_FILETY') to &lt;lv_param&gt;.
+    if sy-subrc = 0.
+      lwa_param-p_filety = &lt;lv_param&gt;.
+    endif.
+
+    assign ('P_RFCDST') to &lt;lv_param&gt;.
+    if sy-subrc = 0.
+      lwa_param-p_rfcdst = &lt;lv_param&gt;.
+    endif.
+
+    assign ('P_TABLNM') to &lt;lv_param&gt;.
+    if sy-subrc = 0.
+      lwa_param-p_tablnm = &lt;lv_param&gt;.
+    endif.
+
+    assign ('P_FLDSEL') to &lt;lv_param&gt;.
+    if sy-subrc = 0.
+      lwa_param-p_fldsel = &lt;lv_param&gt;.
+    endif.
+
+    assign ('P_OPTION') to &lt;lv_param&gt;.
+    if sy-subrc = 0.
+      lwa_param-p_option = &lt;lv_param&gt;.
+    endif.
+
+    assign ('P_MXROWS') to &lt;lv_param&gt;.
+    if sy-subrc = 0.
+      lwa_param-p_mxrows = &lt;lv_param&gt;.
+    endif.
+
+    assign ('P_PACKSZ') to &lt;lv_param&gt;.
+    if sy-subrc = 0.
+      lwa_param-p_packsz = &lt;lv_param&gt;.
+    endif.
+
+  endif.
+
+  "If the parameters do not exist hard code the values.
+  if lwa_param is initial.
+
+    "Set the directory.
+    lwa_param-p_dircty = '/usr/sap/trans/Temp/DEV/DRA/'.
+    lwa_param-p_filenm = 'RFC_DEC'.
+    lwa_param-p_filety = '.bin'.
+
+    "Set the RFC destination.
+    lwa_param-p_rfcdst = 'DECCLNT200'.
+
+    "Set the table.
+    lwa_param-p_tablnm = 'TADIR'.
+
+    lwa_param-p_fldsel =
+      'PGMID|OBJECT|OBJ_NAME|KORRNUM'.
+
+    lwa_param-p_option =
+      `OBJECT = 'PROG' and |AUTHOR = '104087'`.
+
+    "Set the max rows to retrieve.
+    lwa_param-p_mxrows = 100.
+
+    "Set the segment size in rows.
+    lwa_param-p_packsz = 10.
+
+  endif.
+
+  "Set the delimiter.
+  lv_delimiter = '|'.
+
+<font color ="#0000FF">*/  Step 1: Read DDIC to retrieve table structure.</font>
+
+  "Retrieve the Data Dictionary meta-data for the target table.
+  if lt_dd03l_rfcdata is initial.
+
+    "Set the options to extract the fields of the source table.
+    lwa_dd03l_options-text
+      = |TABNAME = '{ lwa_param-p_tablnm }'| &&
+        | AND AS4LOCAL = 'A'|.
+    append lwa_dd03l_options to lt_dd03l_options.
+
+    "Set the options to exclude exclude append structure definitions.
+    lwa_dd03l_options-text = | AND ( COMPTYPE = 'E' OR COMPTYPE = '' )|.
+    append lwa_dd03l_options to lt_dd03l_options.
+
+    "Set DDIC fields to read.
+    lv_csv_dd03l_fields =
+      |FIELDNAME,0,30,C;| &&
+      |POSITION,30,4,N;| &&
+      |INTTYPE,35,1,C;| &&
+      |INTLEN,36,6,C;| &&
+      |LENG,42,6,N;| &&
+      |DECIMALS,48,6,N|.
+
+    "Convert serialised data.
+    split lv_csv_dd03l_fields at ';' into table lt_csv_dd03l_fields.
+
+    loop at lt_csv_dd03l_fields into lv_csv_dd03l_fields.
+
+      split lv_csv_dd03l_fields at ','
+        into
+          lwa_fields-fieldname
+          lwa_fields-offset
+          lwa_fields-length
+          lwa_fields-type.
+
+      append lwa_fields to lt_dd03l_fields.
+
+    endloop.
+
+    "Retrieve the Data Dictionary information for the table.
+    call function 'RFC_READ_TABLE' destination lwa_param-p_rfcdst
+      exporting
+        query_table          = 'DD03L'
+        delimiter            = lv_delimiter
+        no_data              = ' '
+        rowskips             = 0
+        rowcount             = 1000
+      tables
+        options              = lt_dd03l_options
+        fields               = lt_dd03l_fields
+        data                 = lt_dd03l_rfcdata
+      exceptions
+        table_not_available  = 1
+        table_without_data   = 2
+        option_not_valid     = 3
+        field_not_valid      = 4
+        not_authorized       = 5
+        data_buffer_exceeded = 6
+        others               = 7.
+    if sy-subrc &lt;&gt; 0.
+      return.
+    endif.
+
+    "Convert the data dictionary data from a delimited string.
+    loop at lt_dd03l_rfcdata into lwa_dd03l_rfcdata.
+
+      split lwa_dd03l_rfcdata
+        at lv_delimiter
+        into
+          lwa_dd03l-fieldname
+          lwa_dd03l-position
+          lwa_dd03l-inttype
+          lwa_dd03l-intlen
+          lwa_dd03l-leng
+          lwa_dd03l-decimals.
+
+      append lwa_dd03l to lt_dd03l.
+
+    endloop.
+
+    "Sort the field list by field position.
+    sort lt_dd03l by position.
+    delete adjacent duplicates from lt_dd03l comparing position.
+
+  endif.
+
+  "Determine the maximum number of fields that can be retrieved.
+  loop at lt_dd03l into lwa_dd03l.
+
+    "The length is the combined length of the fields plus the delimiter.
+    lv_row_length = lv_row_length + lwa_dd03l-leng + 1.
+
+    "The maximum length of the record extracted is 512 characters.
+    if lv_row_length &gt;= 512.
+      exit.
+    endif.
+
+    "Determine the number of fields that can be retrieved.
+    lv_index_to = lv_index_to + 1.
+
+  endloop.
+
+<font color ="#0000FF">*/  Step 2: Use table structure information to create an internal table.</font>
+
+  "Create the table and work area objects.
+  if &lt;lt_data&gt; is not assigned.
+
+    "Define internal table using components.
+    if lt_dd03l is not initial.
+
+      "Process each field in the table definition.
+      loop at lt_dd03l into lwa_dd03l.
+
+        "Only DDIC elements and ABAP built-in types are supported.
+        if not ( lwa_dd03l-comptype = 'E' or lwa_dd03l-comptype = ' ' ).
+          continue.
+        endif.
+
+        "The following built-in data types are not supported.
+        if
+          lwa_dd03l-inttype = ' ' or
+          lwa_dd03l-inttype = 'a' or
+          lwa_dd03l-inttype = 'e'.
+          continue.
+        endif.
+
+        "Create a reference data object for each component.
+        try.
+
+            case lwa_dd03l-inttype.
+              when 'g'.
+                create data lr_data type string.
+              when 'y'.
+                create data lr_data type xstring.
+              when 'I' or 'X' or 's'.
+                create data lr_data type i.
+              when 'D' or 'T' or 'F'.
+                create data lr_data type (lwa_dd03l-inttype).
+              when 'P'.
+                create data lr_data type p
+                                    length lwa_dd03l-intlen
+                                    decimals lwa_dd03l-decimals.
+              when others.
+                create data lr_data type (lwa_dd03l-inttype)
+                                    length lwa_dd03l-intlen.
+            endcase.
+
+          catch cx_sy_create_data_error into lo_root.
+            lo_root-&gt;get_longtext( ).
+        endtry.
+
+        "Create a run-time type description for the component.
+        call method cl_abap_typedescr=&gt;describe_by_data_ref
+          exporting
+            p_data_ref  = lr_data
+          receiving
+            p_descr_ref = lo_typedescr.
+
+        "Add the component definition to the component list.
+        lwa_component-name = lwa_dd03l-fieldname.
+        lwa_component-type ?= lo_typedescr.
+        append lwa_component to lt_component.
+
+      endloop.
+
+      "Create a structure definition based on the field definitions.
+      try.
+
+          call method cl_abap_structdescr=&gt;create
+            exporting
+              p_components = lt_component
+            receiving
+              p_result     = lo_structdescr.
+
+        catch cx_sy_struct_creation .
+      endtry.
+
+      "Create a work area based on the structure definition.
+      create data lwa_data type handle lo_structdescr.
+      assign lwa_data-&gt;* to &lt;lwa_data&gt;.
+
+      "Create an internal table data object based on the work area.
+      create data lt_data like table of &lt;lwa_data&gt;.
+      assign lt_data-&gt;* to &lt;lt_data&gt;.
+
+      "Create a copy of the table object for the segment.
+      create data lt_data_segment like &lt;lt_data&gt;.
+      assign lt_data_segment-&gt;* to &lt;lt_data_segment&gt;.
+
+      "Create table to collect tge segments.
+      create data lt_data_segments like table of &lt;lt_data&gt;.
+      assign lt_data_segments-&gt;* to &lt;lt_data_segments&gt;.
+
+    else.
+      return.
+    endif.
+
+  endif.
+
+<font color ="#0000FF">*/  Step 3: Retrieve table data, unpack and write to target file.</font>
+
+  "Clear the data before the second RFC enabled read.
+  clear:
+    lwa_options,
+    lt_options.
+
+  if lwa_param-p_option is not initial.
+
+    split lwa_param-p_option at '|' into table lt_option.
+
+    loop at lt_option into lv_option.
+
+      lwa_options-text = lv_option.
+      append lwa_options to lt_options.
+
+    endloop.
+
+  endif.
+
+  "Clear the data before the second RFC enabled read.
+  clear:
+    lwa_fields,
+    lt_fields.
+
+  if lwa_param-p_fldsel is not initial.
+
+    split lwa_param-p_fldsel
+      at lv_delimiter into table lt_fields_selected.
+
+    "Convert the data dictionary definition.
+    loop at lt_dd03l into lwa_dd03l.
+
+      read table lt_fields_selected transporting no fields
+        with key
+          table_line = lwa_dd03l-fieldname.
+      if sy-subrc = 0.
+
+        lwa_fields-fieldname = lwa_dd03l-fieldname.
+        lwa_fields-offset    = lwa_fields-offset + lwa_fields-length.
+        lwa_fields-length    = lwa_dd03l-leng.
+        lwa_fields-type      = lwa_dd03l-inttype.
+        lwa_fields-fieldtext = ''.
+        append lwa_fields to lt_fields.
+
+      endif.
+
+    endloop.
+
+  else.
+
+    "Convert the data dictionary definition.
+    loop at lt_dd03l into lwa_dd03l from 1 to lv_index_to.
+
+      lwa_fields-fieldname = lwa_dd03l-fieldname.
+      lwa_fields-offset    = lwa_fields-offset + lwa_fields-length.
+      lwa_fields-length    = lwa_dd03l-leng.
+      lwa_fields-type      = lwa_dd03l-inttype.
+      lwa_fields-fieldtext = ''.
+      append lwa_fields to lt_fields.
+
+    endloop.
+
+  endif.
+
+  "Retrieve the table data.
+  call function 'RFC_READ_TABLE' destination lwa_param-p_rfcdst
+    exporting
+      query_table          = lwa_param-p_tablnm
+      delimiter            = lv_delimiter
+      no_data              = ' '
+      rowskips             = 0
+      rowcount             = lwa_param-p_mxrows
+    tables
+      options              = lt_options
+      fields               = lt_fields
+      data                 = lt_rfcdata
+    exceptions
+      table_not_available  = 1
+      table_without_data   = 2
+      option_not_valid     = 3
+      field_not_valid      = 4
+      not_authorized       = 5
+      data_buffer_exceeded = 6
+      others               = 7.
+  if sy-subrc &lt;&gt; 0.
+    return.
+  endif.
+
+  "Loop through each record received from the RFC call.
+  if lt_rfcdata is not initial.
+
+    loop at lt_rfcdata into lwa_rfcdata.
+
+      clear &lt;lwa_data&gt;.
+
+      "Split the data in a string format using the delimiter.
+      split lwa_rfcdata at lv_delimiter into table lt_splitdata.
+
+      "Loop through each field in the table definition.
+      loop at lt_dd03l into lwa_dd03l.
+
+        "Assign the component of the structure.
+        assign component lwa_dd03l-fieldname
+          of structure &lt;lwa_data&gt; to &lt;lv_comp&gt;.
+        if sy-subrc = 0.
+
+          read table lt_fields transporting no fields
+            with key
+              fieldname = lwa_dd03l-fieldname.
+          if sy-subrc = 0.
+
+            "Store the index for the field.
+            lv_index = sy-tabix.
+
+            "Retrieve the field value that corresponds to the fieldname.
+            read table lt_splitdata index lv_index into lv_splitdata.
+            if sy-subrc = 0.
+
+              try.
+
+                  "Move the field value to the field.
+                  &lt;lv_comp&gt; = lv_splitdata.
+
+                catch cx_sy_conversion_no_number.
+
+                  lwa_conv_error-comp = lwa_dd03l-fieldname.
+                  lwa_conv_error-line = lwa_rfcdata-wa.
+                  append lwa_conv_error to lt_conv_error.
+
+                  continue.
+
+              endtry.
+
+            endif.
+
+          endif.
+
+        endif.
+
+      endloop.
+
+      "Add the record received from the RFC call.
+      append &lt;lwa_data&gt; to &lt;lt_data&gt;.
+
+    endloop.
+
+    "Clear string data extracted from RFC.
+    clear lt_rfcdata.
+
+  endif.
+
+  "Break the data up into segments to avoid exceeding string limitation.
+  if &lt;lt_data&gt; is not initial.
+
+    loop at &lt;lt_data&gt; into &lt;lwa_data&gt;.
+
+      append &lt;lwa_data&gt; to &lt;lt_data_segment&gt;.
+
+      if lines( &lt;lt_data_segment&gt; ) &gt;= lwa_param-p_packsz.
+
+        append &lt;lt_data_segment&gt; to &lt;lt_data_segments&gt;.
+        clear &lt;lt_data_segment&gt;.
+
+      endif.
+
+    endloop.
+
+    "Check if there are any records remaining.
+    if &lt;lt_data_segment&gt; is not initial.
+
+      append &lt;lt_data_segment&gt; to &lt;lt_data_segments&gt;.
+
+    endif.
+
+    "Clear non-segmented data.
+    clear &lt;lt_data&gt;.
+
+  endif.
+
+  "Convert to XML, then XString, the ZIP and save each segment.
+  loop at &lt;lt_data_segments&gt; into &lt;lt_data_segment&gt;.
+
+    "Increment the segment number.
+    lv_segment_nr = lv_segment_nr + 1.
+    lv_segment_id =
+      |{ lv_segment_nr  width = 3 align = right pad = '0' }|.
+
+    "Set the target location on the application server.
+    lv_filepath = |{ lwa_param-p_dircty }{ lwa_param-p_filenm }_| &&
+                  |{ lv_segment_id }{ lwa_param-p_filety }|.
+
+    "Convert the table to an XML string.
+    call transformation id
+      source tab = &lt;lt_data_segment&gt;
+      result xml lv_xml.
+
+    "Convert the XML to XString for the zip method.
+    call function 'LXE_COMMON_STRING_TO_XSTRING'
+      exporting
+        in_string  = lv_xml
+      importing
+        ex_xstring = lv_xstr
+      exceptions
+        error      = 1
+        others     = 2.
+    if sy-subrc &lt;&gt; 0.
+      return.
+    endif.
+
+    "Create instance of the zip class.
+    create object lo_zip.
+
+    "Add the XString to the zip container.
+    call method lo_zip-&gt;add
+      exporting
+        name    = 'RFCDATA_ZIP'
+        content = lv_xstr.
+
+    "Get the binary stream for ZIP file.
+    lv_xstr_zip = lo_zip-&gt;save( ).
+
+    "Save binary file to application server.
+    open dataset lv_filepath for output in binary mode.
+    transfer lv_xstr_zip to lv_filepath.
+    close dataset lv_filepath.
+
+  endloop.
+
+  if lt_conv_error is not initial.
+
+    "Set the target location on the application server.
+    lv_filepath =
+      lwa_param-p_dircty &&
+      lwa_param-p_filenm &&
+      '_ERRLOG.txt'.
+
+    "Open file on server.
+    open dataset lv_filepath for output in text mode encoding default.
+
+    loop at lt_conv_error into lwa_conv_error.
+
+      lv_str =
+        |{ lwa_conv_error-comp width = 30 }| &&
+        lwa_conv_error-line.
+
+      "Transfer text to file.
+      transfer lv_str to lv_filepath.
+
+    endloop.
+
+    "Close file on server.
+    close dataset lv_filepath.
+
+  endif.
+
+  return.
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* DIR Target directory</font>
+<font color ="#0000FF">* SEG Data retrieval</font>
+<font color ="#0000FF">* TAB Table parameters</font>
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_DIRCTY         Directory on server</font>
+<font color ="#0000FF">* P_FILENM         File name</font>
+<font color ="#0000FF">* P_FILETY         File extension</font>
+<font color ="#0000FF">* P_FLDSEL         Fields selected</font>
+<font color ="#0000FF">* P_MXROWS         Maximum rows retrieved</font>
+<font color ="#0000FF">* P_OPTION         Options (Where clause)</font>
+<font color ="#0000FF">* P_PACKSZ         Rows in each file</font>
+<font color ="#0000FF">* P_RFCDST         Remote system</font>
+<font color ="#0000FF">* P_TABLNM         Read from source table</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

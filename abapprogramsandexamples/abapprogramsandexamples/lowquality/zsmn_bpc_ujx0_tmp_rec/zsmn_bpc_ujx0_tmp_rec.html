@@ -1,0 +1,115 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>ZSMN_BPC_UJX0_TMP_REC</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: ZSMN_BPC_UJX0_TMP_REC</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  BPC adjust Request-Response log - UJX0_TMP_REC</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  ZSMN_BPC_UJX0_TMP_REC</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*& Refer to SAPScript for further details.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report zsmn_bpc_ujx0_tmp_rec.
+
+selection-screen begin of block b1 with frame title text-001.
+select-options s_usrnm for sy-uname obligatory.
+selection-screen end of block b1.
+
+selection-screen begin of block b3 with frame title text-002.
+parameters p_commit type rs_bool.
+selection-screen end of block b3.
+
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl DEFINITION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl definition.
+
+  public section.
+
+    class-methods main.
+    class-methods delete_user_log.
+
+endclass.                    "lcl DEFINITION
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl IMPLEMENTATION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl implementation.
+
+  method main.
+
+    delete_user_log( ).
+
+  endmethod.                    "main
+
+  method delete_user_log.
+
+    data:
+      lt_tmp_rec                   type table of ujx0_tmp_rec,
+      lv_mtext                     type string.
+
+    "Retrieve Request-Response logs.
+    select
+        user_id
+        seq_num
+      into corresponding fields of table lt_tmp_rec
+      from ujx0_tmp_rec
+      where user_id in s_usrnm.
+    if sy-subrc &lt;&gt; 0.
+
+      lv_mtext = |No records found in table UJX0_TMP_REC for the selection.|.
+      message lv_mtext type 'I'.
+
+    else.
+
+      "Delete selected Request-Response logs.
+      if p_commit = 'X'.
+        delete ujx0_tmp_rec from table lt_tmp_rec.
+      endif.
+
+      lv_mtext = |{ lines( lt_tmp_rec ) } records deleted from table UJX0_TMP_REC.|.
+      message lv_mtext type 'I'.
+
+    endif.
+
+  endmethod.                    "delete_user_log
+
+endclass.                    "lcl IMPLEMENTATION
+
+start-of-selection.
+
+  lcl=&gt;main( ).
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* 001 Select users</font>
+<font color ="#0000FF">* 002 Option</font>
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_COMMIT         Commit</font>
+<font color ="#0000FF">* S_USRNM D       .</font>
+
+
+<font color ="#0000FF">*Messages</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">*YPE</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

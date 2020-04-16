@@ -1,0 +1,180 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>ZPG_SCRATCHPAD_ACTIVATE_DDIC</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: ZPG_SCRATCHPAD_ACTIVATE_DDIC</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Scratchpad</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  ZPG_SCRATCHPAD</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report zpg_scratchpad_activate_ddic.
+
+data:
+  lv_tabname                     type dd02l-tabname,
+  lt_dv_tabname                  type table of dd02l-tabname.
+
+append '/BIC/B0000513000' to lt_dv_tabname.
+append '/BIC/B0000514000' to lt_dv_tabname.
+append '/BIC/B0000518000' to lt_dv_tabname.
+append '/BIC/B0000520000' to lt_dv_tabname.
+append '/BIC/B0000916000' to lt_dv_tabname.
+append '/BIC/B0000928000' to lt_dv_tabname.
+append '/BIC/B0000995000' to lt_dv_tabname.
+append '/BIC/B0000997000' to lt_dv_tabname.
+append '/BIC/B0000998000' to lt_dv_tabname.
+append '/BIC/B0001000000' to lt_dv_tabname.
+append '/BIC/B0001001000' to lt_dv_tabname.
+append '/BIC/B0001043000' to lt_dv_tabname.
+append '/BIC/B0001044000' to lt_dv_tabname.
+append '/BIC/B0001045000' to lt_dv_tabname.
+append '/BIC/B0001046000' to lt_dv_tabname.
+append '/BIC/B0001047000' to lt_dv_tabname.
+append '/BIC/B0001048000' to lt_dv_tabname.
+append '/BIC/B0001049000' to lt_dv_tabname.
+append '/BIC/B0001050000' to lt_dv_tabname.
+append '/BIC/B0001059000' to lt_dv_tabname.
+append '/BIC/B0001060000' to lt_dv_tabname.
+append '/BIC/B0001062000' to lt_dv_tabname.
+append '/BIC/B0001063000' to lt_dv_tabname.
+append '/BIC/B0001064000' to lt_dv_tabname.
+append '/BIC/B0001069000' to lt_dv_tabname.
+append '/BIC/B0001071000' to lt_dv_tabname.
+append '/BIC/B0001072000' to lt_dv_tabname.
+append '/BIC/B0001074000' to lt_dv_tabname.
+append '/BIC/B0001076000' to lt_dv_tabname.
+append '/BIC/B0001168000' to lt_dv_tabname.
+append '/BIC/B0001169000' to lt_dv_tabname.
+append '/BIC/B0001270000' to lt_dv_tabname.
+append '/BIC/B0001297000' to lt_dv_tabname.
+append '/BIC/B0001300000' to lt_dv_tabname.
+append '/BIC/B0001313000' to lt_dv_tabname.
+append '/BIC/B0001382000' to lt_dv_tabname.
+append '/BIC/B0001383000' to lt_dv_tabname.
+append '/BIC/B0001384000' to lt_dv_tabname.
+append '/BIC/B0001416000' to lt_dv_tabname.
+append '/BIC/B0001417000' to lt_dv_tabname.
+append '/BIC/B0001495000' to lt_dv_tabname.
+append '/BIC/B0001683000' to lt_dv_tabname.
+append '/BIC/B0001699000' to lt_dv_tabname.
+append '/BIC/B0001700000' to lt_dv_tabname.
+append '/BIC/B0001701000' to lt_dv_tabname.
+append '/BIC/B0001702000' to lt_dv_tabname.
+append '/BIC/B0001705000' to lt_dv_tabname.
+append '/BIC/B0001706000' to lt_dv_tabname.
+append '/BIC/B0001741000' to lt_dv_tabname.
+append '/BIC/B0001753000' to lt_dv_tabname.
+append '/BIC/B0001755000' to lt_dv_tabname.
+append '/BIC/B0001801000' to lt_dv_tabname.
+append '/BIC/B0001802000' to lt_dv_tabname.
+append '/BIC/B0001838000' to lt_dv_tabname.
+append '/BIC/B0001873000' to lt_dv_tabname.
+append '/BIC/B0001896000' to lt_dv_tabname.
+append '/BIC/B0002026000' to lt_dv_tabname.
+append '/BIC/B0002033000' to lt_dv_tabname.
+append '/BIC/B0002035000' to lt_dv_tabname.
+append '/BIC/B0002036000' to lt_dv_tabname.
+append '/BIC/B0002056000' to lt_dv_tabname.
+append '/BIC/B0002057000' to lt_dv_tabname.
+append '/BIC/B0002058000' to lt_dv_tabname.
+append '/BIC/B0002086000' to lt_dv_tabname.
+append '/BIC/B0002093000' to lt_dv_tabname.
+append '/BIC/B0002094000' to lt_dv_tabname.
+append '/BIC/B0002095000' to lt_dv_tabname.
+append '/BIC/B0002106000' to lt_dv_tabname.
+append '/BIC/B0002151000' to lt_dv_tabname.
+append '/BIC/B0002153000' to lt_dv_tabname.
+append '/BIC/B0002155000' to lt_dv_tabname.
+append '/BIC/B0002317000' to lt_dv_tabname.
+append '/BIC/B0002318000' to lt_dv_tabname.
+append '/BIC/B0002319000' to lt_dv_tabname.
+append '/BIC/B0002321000' to lt_dv_tabname.
+append '/BIC/B0002361000' to lt_dv_tabname.
+append '/BIC/B0003348000' to lt_dv_tabname.
+append '/BIC/B0003379000' to lt_dv_tabname.
+append '/BIC/B0003380000' to lt_dv_tabname.
+append '/BIC/B0003381000' to lt_dv_tabname.
+append '/BIC/B0003446000' to lt_dv_tabname.
+append '/BIC/B0003447000' to lt_dv_tabname.
+append '/BIC/B0003448000' to lt_dv_tabname.
+append '/BIC/B0003450000' to lt_dv_tabname.
+append '/BIC/B0003451000' to lt_dv_tabname.
+append '/BIC/B0003452000' to lt_dv_tabname.
+append '/BIC/B0003454000' to lt_dv_tabname.
+append '/BIC/B0003455000' to lt_dv_tabname.
+append '/BIC/B0003456000' to lt_dv_tabname.
+append '/BIC/B0003457000' to lt_dv_tabname.
+append '/BIC/B0003458000' to lt_dv_tabname.
+append '/BIC/B0003459000' to lt_dv_tabname.
+append '/BIC/B0003460000' to lt_dv_tabname.
+append '/BIC/B0003461000' to lt_dv_tabname.
+append '/BIC/B0003472000' to lt_dv_tabname.
+append '/BIC/B0003473000' to lt_dv_tabname.
+append '/BIC/B0003474000' to lt_dv_tabname.
+append '/BIC/B0003475000' to lt_dv_tabname.
+append '/BIC/B0003476000' to lt_dv_tabname.
+append '/BIC/B0003478000' to lt_dv_tabname.
+append '/BIC/B0003479000' to lt_dv_tabname.
+append '/BIC/B0003480000' to lt_dv_tabname.
+append '/BIC/B0003481000' to lt_dv_tabname.
+append '/BIC/B0003482000' to lt_dv_tabname.
+append '/BIC/B0003483000' to lt_dv_tabname.
+append '/BIC/B0003484000' to lt_dv_tabname.
+append '/BIC/B0003509000' to lt_dv_tabname.
+append '/BIC/B0003558000' to lt_dv_tabname.
+append '/BIC/B0003559000' to lt_dv_tabname.
+append '/BIC/B0003709000' to lt_dv_tabname.
+append '/BIC/B0003710000' to lt_dv_tabname.
+append '/BIC/B0003757000' to lt_dv_tabname.
+append '/BIC/B0003970000' to lt_dv_tabname.
+append '/BIC/B0003971000' to lt_dv_tabname.
+append '/BIC/B0003972000' to lt_dv_tabname.
+append '/BIC/B0004012000' to lt_dv_tabname.
+append '/BIC/B0004013000' to lt_dv_tabname.
+append '/BIC/B0004014000' to lt_dv_tabname.
+append '/BIC/B0004463000' to lt_dv_tabname.
+append '/BIC/B0004535000' to lt_dv_tabname.
+append '/BIC/B0004556000' to lt_dv_tabname.
+append '/BIC/B0004757000' to lt_dv_tabname.
+append '/BIC/B0006852000' to lt_dv_tabname.
+
+
+loop at lt_dv_tabname into lv_tabname.
+
+  call function 'DD_TABL_ACTIVATE'
+    exporting
+      tabname                  = lv_tabname
+<font color ="#0000FF">*   AUTH_CHK                 = 'X'</font>
+<font color ="#0000FF">*   PRID                     = 0</font>
+<font color ="#0000FF">* IMPORTING</font>
+<font color ="#0000FF">*   RESULT                   =</font>
+<font color ="#0000FF">* EXCEPTIONS</font>
+<font color ="#0000FF">*   ACT_REFUSED              = 1</font>
+<font color ="#0000FF">*   ACT_FAILURE              = 2</font>
+<font color ="#0000FF">*   ACT_UNLOCK_FAILURE       = 3</font>
+<font color ="#0000FF">*   ILLEGAL_VALUE            = 4</font>
+<font color ="#0000FF">*   OTHERS                   = 5</font>
+            .
+  if sy-subrc &lt;&gt; 0.
+    continue.
+  endif.
+
+endloop.
+
+
+return.
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

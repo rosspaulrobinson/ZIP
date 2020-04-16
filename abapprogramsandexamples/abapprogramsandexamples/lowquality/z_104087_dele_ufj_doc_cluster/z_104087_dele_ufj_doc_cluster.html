@@ -1,0 +1,197 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_104087_DELE_UFJ_DOC_CLUSTER</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_104087_DELE_UFJ_DOC_CLUSTER</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Delete UJF_DOC_CLUSTER files</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_104087_DELE_UFJ_DOC_CLUSTER</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This program will delete entries from UJF_DOC_CLUSTER if there is</font>
+<font color ="#0000FF">*&  not a corresponding entry in table UJF_DOC. It is understood that</font>
+<font color ="#0000FF">*&  UJF_DOC and UJF_DOC_CLUSTER can become unsynchronised if a</font>
+<font color ="#0000FF">*&  directory is delete in transaction UJFS instead of deleting the</font>
+<font color ="#0000FF">*&  specific files. The UJF_DOC_CLUSTER contains data for Data Manager</font>
+<font color ="#0000FF">*&  files in BPC 10.0 and earlier.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_104087_dele_ufj_doc_cluster.
+
+data:
+  lv_cusid type uj_clusid3.
+
+selection-screen begin of block b1 with frame title text-001.
+select-options s_clusid for lv_cusid.
+parameters p_commit type rs_bool default ' '.
+parameters p_sdele type rs_bool default 'X'.
+parameters p_skeep type rs_bool default 'X'.
+selection-screen end of block b1.
+
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl DEFINITION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl definition.
+
+  public section.
+
+    class-methods main.
+
+endclass  .                  "lcl DEFINITION
+
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl IMPLEMENTATION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl implementation.
+
+  method main.
+
+    data:
+      lv_cursor                    type cursor,
+      lv_package_size              type i,
+      lwa_doc_cluster              type ujf_doc_cluster,
+      lt_doc_cluster               type table of ujf_doc_cluster,
+      lwa_doc                      type ujf_doc,
+      lt_doc                       type table of ujf_doc,
+      lv_clusid                    type uj_clusid3,
+      lt_so_clusid                 type range of uj_clusid3,
+      lwa_so_clusid                like line of lt_so_clusid,
+      lt_dv_clusid_d               type table of uj_clusid3,
+      lt_dv_clusid_k               type table of uj_clusid3,
+      lv_mtext                     type string.
+
+    "Open cursor to retrieve UJF_DOC_CLUSTER data.
+    open cursor lv_cursor for
+      select
+          mandt
+          relid
+          clusid
+          srtf
+        from ujf_doc_cluster
+        where relid = 'DM' and
+              clusid in s_clusid.
+
+    "Retrieve UJF_DOC_CLUSTER data.
+    do.
+
+      fetch next cursor lv_cursor
+        appending corresponding fields of table lt_doc_cluster
+        package size lv_package_size.
+      if sy-subrc &lt;&gt; 0.
+        close cursor lv_cursor.
+        exit.
+      endif.
+
+    enddo.
+
+    "Get the GUID for documents in UJF_DOC.
+    select
+        doc_guid
+      into corresponding fields of table lt_doc
+      from ujf_doc
+      where
+        docname like '%\DATAFILES\%'.
+
+    "Fill the range table for DM documents in table UJF_DOC.
+    loop at lt_doc into lwa_doc.
+
+      lwa_so_clusid-sign = 'I'.
+      lwa_so_clusid-option = 'CP'.
+      lwa_so_clusid-low = |{ lwa_doc-doc_guid }*|.
+      append lwa_so_clusid to lt_so_clusid.
+
+    endloop.
+
+    loop at lt_doc_cluster into lwa_doc_cluster.
+
+      if lwa_doc_cluster-clusid not in lt_so_clusid.
+
+        "If commit parameter set.
+        if p_commit = 'X'.
+
+          "Delete Cluster ID.
+          delete ujf_doc_cluster from lwa_doc_cluster.
+
+        endif.
+
+        "Collect Cluster IDs that are deleted for messaging.
+        collect lwa_doc_cluster-clusid into lt_dv_clusid_d.
+
+      else.
+
+        "Collect Cluster IDs that are retained for messaging.
+        collect lwa_doc_cluster-clusid into lt_dv_clusid_k.
+
+      endif.
+
+    endloop.
+
+    lv_mtext = |{ lines( lt_dv_clusid_d ) } Cluster IDs deleted.'|.
+    write: / lv_mtext.
+
+    lv_mtext = |{ lines( lt_dv_clusid_k ) } Cluster IDs retained.'|.
+    write: / lv_mtext.
+
+    set blank lines on.
+    write: / '' as line.
+
+    "Output to spool Cluster IDs deleted.
+    if p_sdele = 'X'.
+
+      loop at lt_dv_clusid_d into lv_clusid.
+
+        lv_mtext = |Doc Cluster ID '{ lv_clusid }' deleted.'|.
+        write: / lv_mtext.
+
+      endloop.
+
+    endif.
+
+    "Output to spool Cluster IDs retained.
+    if p_skeep = 'X'.
+
+      loop at lt_dv_clusid_k into lv_clusid.
+
+        lv_mtext = |Doc Cluster ID '{ lv_clusid }' retained.'|.
+        write: / lv_mtext.
+
+      endloop.
+
+    endif.
+
+  endmethod.                    "main
+
+endclass.                    "lcl DEFINITION
+
+start-of-selection.
+
+  lcl=&gt;main( ).
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* 001 Options</font>
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_COMMIT         Commit</font>
+<font color ="#0000FF">* P_SDELE         Output Cluster ID Deletion</font>
+<font color ="#0000FF">* P_SKEEP         Output Cluster ID Retention</font>
+<font color ="#0000FF">* S_CLUSID         Cluster ID</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

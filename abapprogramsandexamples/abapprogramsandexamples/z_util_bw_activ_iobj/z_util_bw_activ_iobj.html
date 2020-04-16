@@ -1,0 +1,119 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_BW_ACTIV_IOBJ</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_BW_ACTIV_IOBJ</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Activate InfoObjects</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_BW_ACTIV_IOBJ</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This program enables the activation of a list of InfoObjects.</font>
+<font color ="#0000FF">*&  The select-options parameter does not support patterns.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_bw_activ_iobj.
+
+load-of-program.
+
+  data:
+    gv_iobjnm                  type rsiobjnm.
+
+  selection-screen begin of block b1 with frame title _title_1.
+  select-options s_iobjnm for gv_iobjnm obligatory.
+  selection-screen end of block b1.
+
+  selection-screen begin of block b2 with frame title _title_2.
+  parameters p_authrl type rs_bool default ''.
+  parameters p_simult type rs_bool default 'X'.
+  selection-screen end of block b2.
+
+initialization.
+
+  _title_1 = 'Selection'.
+  _title_2 = 'Options'.
+
+  %_p_authrl_%_app_%-text = 'Auth. Relevant Characteristics'.
+  %_p_simult_%_app_%-text = 'Only simulate selection'.
+  %_s_iobjnm_%_app_%-text = 'InfoObject'.
+
+start-of-selection.
+
+  data:
+    lv_iobjnm                        type rsiobjnm,
+    lt_iobjnm                        type table of rsiobjnm,
+    lt_infoobjects                   type table of bapi6108io,
+    lwa_return                       type bapiret2,
+    lt_return                        type table of bapiret2,
+    lt_infoobjects_error             type table of bapi6108io.
+
+  check s_iobjnm[] is not initial.
+
+  if p_authrl = rs_c_true.
+
+    "Retrieve the Auth. Relevant characteristics for the selection.
+    select chanm
+      into table lt_iobjnm
+      from rsdcha
+      where chanm in s_iobjnm and
+            objvers = 'M' and
+            authrelfl = 'X'.
+
+  else.
+
+    "Retrieve the InfoObjects for the selection.
+    select iobjnm
+      into table lt_iobjnm
+      from rsdiobj
+      where iobjnm in s_iobjnm and
+            objvers = 'M'.
+
+  endif.
+
+  if p_simult = rs_c_true.
+
+    write: / 'InfoObjects selected for activation.'.
+
+    "Output InfoObjects selected.
+    loop at lt_iobjnm into lv_iobjnm.
+
+      write: / lv_iobjnm.
+
+    endloop.
+
+  else.
+
+    "Activate each InfoObject in the order returned from the SQL.
+    loop at lt_iobjnm into lv_iobjnm.
+
+      clear lt_infoobjects.
+      append lv_iobjnm to lt_infoobjects.
+
+      "Activate the InfoObject.
+      call function 'BAPI_IOBJ_ACTIVATE_MULTIPLE'
+        tables
+          infoobjects       = lt_infoobjects
+          return            = lt_return
+          infoobjects_error = lt_infoobjects_error.
+
+      "Output any messages.
+      loop at lt_return into lwa_return.
+        write: / lwa_return-message.
+      endloop.
+
+    endloop.
+
+  endif.
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

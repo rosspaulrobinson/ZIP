@@ -1,0 +1,863 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>ZSMN_BWU_BMUM_01</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: ZSMN_BWU_BMUM_01</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Update (Insert or Delete) BPC User-Team assignments</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  ZSMN_BWU_BMUM_01</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Author:         Ross Robinson (104087)</font>
+<font color ="#0000FF">*& Reference:      INC000002532627</font>
+<font color ="#0000FF">*& Purpose:        Refer to SAPScript documentation.</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report zsmn_bwu_bmum_01 message-id zx_bwu_bmum.
+
+data:
+  lwa_file_table                   type file_table,
+  lt_file_table                    type filetable,
+  lv_rc                            type i,
+  lv_data_rec                      type string,
+  lt_data_tab                      type stringtab,
+  lv_result                        type rs_bool.
+
+types:
+  begin of ty_wa_assign,
+    user_id                        type uj_user_id,
+    team_id                        type uj_team_id,
+    is_leader                      type uj_flg,
+    action                         type uj_action,
+    rec_no                         type i,
+  end of ty_wa_assign,
+  ty_t_assign                      type table of ty_wa_assign with non-unique key user_id, team_id.
+
+types:
+  begin of ty_wa_user_assign,
+    user_id                        type uj_user_id,
+    t_insert                       type ty_t_assign,
+    t_insert_tl                    type ty_t_assign,
+    t_delete                       type ty_t_assign,
+  end of ty_wa_user_assign,
+  ty_t_user_assign                 type table of ty_wa_user_assign with non-unique key user_id.
+
+types:
+  begin of ty_wa_team_assign,
+    team_id                        type uj_team_id,
+    t_insert                       type ty_t_assign,
+    t_insert_tl                    type ty_t_assign,
+    t_delete                       type ty_t_assign,
+  end of ty_wa_team_assign,
+  ty_t_team_assign                 type table of ty_wa_team_assign with non-unique key team_id.
+
+data:
+  lwa_assign                       type ty_wa_assign,
+  lt_assign                        type table of ty_wa_assign,
+  lwa_user_assign                  type ty_wa_user_assign,
+  lt_user_assign                   type ty_t_user_assign,
+  lwa_team_assign                  type ty_wa_team_assign,
+  lt_team_assign                   type ty_t_team_assign.
+
+field-symbols:
+  &lt;lwa_user_assign&gt;                type ty_wa_user_assign,
+  &lt;lwa_team_assign&gt;                type ty_wa_team_assign,
+  &lt;lt_assign&gt;                      type ty_t_assign.
+
+data:
+  lv_appset                        type uj_appset_id,
+  lt_profs                         type uje_t_profile_action,
+  lwa_profs                        like line of lt_profs,
+  lwa_users                        type uje_s_user_action,
+  lt_users                         type uje_t_user_action,
+  lwa_user_id                      type uje_s_user_id,
+  lt_user_id                       type uje_t_user_id,
+  lwa_teams                        type uje_s_team,
+  lt_teams                         type uje_t_team,
+  lt_teams_all                     type uje_t_team,
+  lwa_teamdetail                   type uje_s_teamdetail,
+  lt_teamdetail                    type uje_t_teamdetail,
+  lv_action                        type uj_action,
+  lv_leader                        type uj_flg.
+
+data:
+  lv_idx                           type i.
+
+data:
+  lv_mtext                         type string,
+  lt_mtext                         type stringtab,
+  lwa_msg                          type bal_s_msg,
+  lt_msg                           type rs_t_msg,
+  lt_msg_hdr                       type rs_t_msg,
+  lt_msg_dtl                       type rs_t_msg,
+  lv_team_err                      type rs_bool,
+  lv_user_err                      type rs_bool,
+  lv_lead_err                      type rs_bool,
+  lv_acti_err                      type rs_bool,
+  lv_crit_err                      type rs_bool,
+  lv_pfix                          type string,
+  lv_pct                           type i,
+  lv_float                         type f.
+
+selection-screen begin of block sel with frame title text-sel.
+
+parameters:
+  p_appset type uj_appset_id default 'COUNCIL'.
+
+parameters:
+  p_filenm type string lower case default 'C:\Data\Update Team Assignments.csv'.
+
+selection-screen end of block sel.
+
+selection-screen begin of block opt with frame title text-opt.
+
+parameters:
+  p_commit type rs_bool.
+
+parameters:
+  p_nochk type rs_bool no-display.
+
+parameters:
+  p_user type rs_bool radiobutton group gp1 default 'X',
+  p_team type rs_bool radiobutton group gp1.
+
+selection-screen end of block opt.
+
+at selection-screen on value-request for p_filenm.
+
+  clear:
+    lt_file_table.
+
+  "Call the file selection dialogue.
+  call method cl_gui_frontend_services=&gt;file_open_dialog
+    changing
+      file_table              = lt_file_table
+      rc                      = lv_rc
+    exceptions
+      file_open_dialog_failed = 1
+      cntl_error              = 2
+      error_no_gui            = 3
+      not_supported_by_gui    = 4
+      others                  = 5.
+  if sy-subrc &lt;&gt; 0.
+<font color ="#0000FF">*   Implement suitable error handling here</font>
+  endif.
+
+  "Read selected file.
+  if lt_file_table is not initial.
+
+    read table lt_file_table into lwa_file_table index 1.
+
+    p_filenm = lwa_file_table-filename.
+
+  endif.
+
+at selection-screen on p_appset.
+
+  clear:
+    lv_appset.
+
+  select single appset_id
+    into lv_appset
+    from uja_appset_info
+    where appset_id = p_appset.
+
+  if lv_appset is initial.
+    message 'Invalid Environment' type 'E'.
+  endif.
+
+at selection-screen on p_filenm.
+
+  clear:
+    lv_result.
+
+  call method cl_gui_frontend_services=&gt;file_exist
+    exporting
+      file                 = p_filenm
+    receiving
+      result               = lv_result
+    exceptions
+      cntl_error           = 1
+      error_no_gui         = 2
+      wrong_parameter      = 3
+      not_supported_by_gui = 4
+      others               = 5.
+  if sy-subrc &lt;&gt; 0.
+<font color ="#0000FF">* Implement suitable error handling here</font>
+  endif.
+
+  if lv_result &lt;&gt; 'X'.
+    message 'File does not exist' type 'E'.
+    return.
+  endif.
+
+at line-selection.
+
+  "Offset the index.
+  lv_idx = sy-curow - 2.
+
+  "Retrieve message details.
+  read table lt_msg into lwa_msg index lv_idx.
+  if sy-subrc = 0.
+
+    "Output message.
+    message id lwa_msg-msgid
+      type 'I'
+      number lwa_msg-msgno
+      with lwa_msg-msgv1
+           lwa_msg-msgv2
+           lwa_msg-msgv3
+           lwa_msg-msgv4.
+
+  endif.
+
+start-of-selection.
+
+  "Retrieve Team assignments to Users file.
+  call method cl_gui_frontend_services=&gt;gui_upload
+    exporting
+      filename                = p_filenm
+    changing
+      data_tab                = lt_data_tab
+    exceptions
+      file_open_error         = 1
+      file_read_error         = 2
+      no_batch                = 3
+      gui_refuse_filetransfer = 4
+      invalid_type            = 5
+      no_authority            = 6
+      unknown_error           = 7
+      bad_data_format         = 8
+      header_not_allowed      = 9
+      separator_not_allowed   = 10
+      header_too_long         = 11
+      unknown_dp_error        = 12
+      access_denied           = 13
+      dp_out_of_memory        = 14
+      disk_full               = 15
+      dp_timeout              = 16
+      not_supported_by_gui    = 17
+      error_no_gui            = 18
+      others                  = 19.
+  if sy-subrc &lt;&gt; 0.
+    return.
+<font color ="#0000FF">* Implement suitable error handling here</font>
+  endif.
+
+  "Retrieve Team meta-data.
+  try.
+
+      call method cl_uje_team=&gt;get_all_team
+        exporting
+          i_appset_id = p_appset
+        importing
+          et_team     = lt_teams_all.
+
+    catch cx_uje_exception .
+  endtry.
+
+  "Retrieve User meta-data.
+  call method cl_uje_user=&gt;get_all_user_id
+    exporting
+      i_appset_id = p_appset
+    importing
+      et_user_id  = lt_user_id.
+
+  "Convert delimited text data into structured data.
+  loop at lt_data_tab into lv_data_rec.
+
+    split lv_data_rec
+      at cl_abap_char_utilities=&gt;horizontal_tab
+      into lwa_assign-user_id
+           lwa_assign-team_id
+           lwa_assign-is_leader
+           lwa_assign-action.
+
+    append lwa_assign to lt_assign.
+
+  endloop.
+
+  "Validate table content.
+  if p_nochk = ' '.
+
+    loop at lt_assign into lwa_assign.
+
+      lv_idx = sy-tabix.
+
+      "Check the team is valid.
+      read table lt_teams_all transporting no fields
+        with key
+          team_id = lwa_assign-team_id.
+      if sy-subrc &lt;&gt; 0.
+
+        message w003 with lwa_assign-team_id lv_idx into lwa_msg-context-value.
+        move-corresponding sy to lwa_msg.
+        append lwa_msg to lt_msg_dtl.
+
+        lv_team_err = 'X'.
+
+      endif.
+
+      "Check the User is valid.
+      read table lt_user_id transporting no fields
+        with key
+          table_line = lwa_assign-user_id.
+      if sy-subrc &lt;&gt; 0.
+
+        message w005 with lwa_assign-user_id lv_idx into lwa_msg-context-value.
+        move-corresponding sy to lwa_msg.
+        append lwa_msg to lt_msg_dtl.
+
+        lv_user_err = 'X'.
+
+      endif.
+
+      "Check the Team Leader flag is valid.
+      if not ( lwa_assign-is_leader = 'X' or lwa_assign-is_leader is initial ).
+
+        message w007 with lwa_assign-is_leader lv_idx into lwa_msg-context-value.
+        move-corresponding sy to lwa_msg.
+        append lwa_msg to lt_msg_dtl.
+
+        lv_lead_err = 'X'.
+
+      endif.
+
+      "Check the Action inidicator is valid.
+      if not ( lwa_assign-action = 'I' or lwa_assign-action = 'D' ).
+
+        message w009 with lwa_assign-action lv_idx into lwa_msg-context-value.
+        move-corresponding sy to lwa_msg.
+        append lwa_msg to lt_msg_dtl.
+
+        lv_acti_err = 'X'.
+
+      endif.
+
+    endloop.
+
+    "Is there an error with the Teams.
+    if lv_team_err = 'X'.
+
+      message e004 into lwa_msg-context-value.
+      move-corresponding sy to lwa_msg.
+      append lwa_msg to lt_msg_hdr.
+
+      lv_crit_err = 'X'.
+
+    endif.
+
+    "Is there an error with the Users.
+    if lv_user_err = 'X'.
+
+      message e006 into lwa_msg-context-value.
+      move-corresponding sy to lwa_msg.
+      append lwa_msg to lt_msg_hdr.
+
+      lv_crit_err = 'X'.
+
+    endif.
+
+    "If there is an error with the Team Leader flag.
+    if lv_lead_err = 'X'.
+
+      message e008 into lwa_msg-context-value.
+      move-corresponding sy to lwa_msg.
+      append lwa_msg to lt_msg_hdr.
+
+      lv_crit_err = 'X'.
+
+    endif.
+
+    "If there is an error with the Action indicator.
+    if lv_acti_err = 'X'.
+
+      message e010 into lwa_msg-context-value.
+      move-corresponding sy to lwa_msg.
+      append lwa_msg to lt_msg_hdr.
+
+      lv_crit_err = 'X'.
+
+    endif.
+
+    "If no critical errors are found.
+    if lv_crit_err &lt;&gt; 'X'.
+
+      message i011 into lwa_msg-context-value.
+      move-corresponding sy to lwa_msg.
+      append lwa_msg to lt_msg_hdr.
+
+    endif.
+
+    "Combine the messages.
+    if lines( lt_msg_hdr ) &lt;&gt; 0.
+
+      append lines of lt_msg_hdr to lt_msg.
+      append initial line to lt_msg.
+      append lines of lt_msg_dtl to lt_msg.
+
+    else.
+      lt_msg = lt_msg_dtl.
+    endif.
+
+    if lv_crit_err = 'X'.
+
+      "Output errors before exit.
+      loop at lt_msg into lwa_msg.
+
+        case lwa_msg-msgty.
+          when 'E'.
+            lv_pfix = '@0A@'.
+          when 'W'.
+            lv_pfix = '@09@'.
+          when 'I'.
+            lv_pfix = '@08@'.
+        endcase.
+
+        if lwa_msg is initial.
+          skip 1.
+          continue.
+        endif.
+
+        lv_mtext = |{ lv_pfix } { lwa_msg-context-value }|.
+
+        write: / lv_mtext hotspot.
+
+      endloop.
+
+      "Exit on errors.
+      return.
+
+    endif.
+
+  endif.
+
+  "Collect assignments by User.
+  if p_user = 'X'.
+
+    loop at lt_assign into lwa_assign.
+
+      lv_idx = sy-tabix.
+
+      "Read the record for the User.
+      read table lt_user_assign assigning &lt;lwa_user_assign&gt;
+        with key
+          user_id = lwa_assign-user_id.
+      if sy-subrc &lt;&gt; 0.
+
+        "If a record for the user does not exist then create it.
+        lwa_user_assign-user_id = lwa_assign-user_id.
+        append lwa_user_assign to lt_user_assign assigning &lt;lwa_user_assign&gt;.
+
+      endif.
+
+      "Collect the Team assignment for the User.
+      lwa_assign-rec_no = lv_idx.
+
+      "Collect based on Action.
+      case lwa_assign-action.
+        when 'I'.
+
+          "Collect based on Team Leader.
+          case lwa_assign-is_leader.
+            when ''.
+              append lwa_assign to &lt;lwa_user_assign&gt;-t_insert.
+            when 'X'.
+              append lwa_assign to &lt;lwa_user_assign&gt;-t_insert_tl.
+          endcase.
+
+        when 'D'.
+          append lwa_assign to &lt;lwa_user_assign&gt;-t_delete.
+      endcase.
+
+    endloop.
+
+  endif.
+
+  "Validate duplicated entries.
+  loop at lt_user_assign into lwa_user_assign.
+    "WIP.
+  endloop.
+
+  "Collect assignments by Team.
+  if p_team = 'X'.
+
+    loop at lt_assign into lwa_assign.
+
+      lv_idx = sy-tabix.
+
+      "Read the record for the User.
+      read table lt_team_assign assigning &lt;lwa_team_assign&gt;
+        with key
+          team_id = lwa_assign-team_id.
+      if sy-subrc &lt;&gt; 0.
+
+        "If a record for the user does not exist then create it.
+        lwa_team_assign-team_id = lwa_assign-team_id.
+        append lwa_team_assign to lt_team_assign assigning &lt;lwa_team_assign&gt;.
+
+      endif.
+
+      "Collect the User assignment for the Team.
+      lwa_assign-rec_no = lv_idx.
+
+      "Collect based on Action.
+      case lwa_assign-action.
+        when 'I'.
+
+          "Collect based on Team Leader.
+          case lwa_assign-is_leader.
+            when ''.
+              append lwa_assign to &lt;lwa_team_assign&gt;-t_insert.
+            when 'X'.
+              append lwa_assign to &lt;lwa_team_assign&gt;-t_insert_tl.
+          endcase.
+
+        when 'D'.
+          append lwa_assign to &lt;lwa_team_assign&gt;-t_delete.
+      endcase.
+
+    endloop.
+
+  endif.
+
+  "Only proceed if the configuration should be updated.
+  if p_commit = 'X'.
+
+    if p_team = 'X'.
+
+      loop at lt_team_assign into lwa_team_assign.
+
+        lv_idx = sy-tabix.
+
+        do 3 times.
+
+          clear:
+            lt_teams.
+
+          case sy-index.
+            when 1.
+
+              "First delete Team assignments.
+              lv_action = 'D'.
+              lv_leader = ''.
+              assign lwa_team_assign-t_delete to &lt;lt_assign&gt;.
+
+            when 2.
+
+              "Second insert Team assignments.
+              lv_action = 'I'.
+              lv_leader = ''.
+              assign lwa_team_assign-t_insert to &lt;lt_assign&gt;.
+
+            when 3.
+
+              "Second insert Team Leader assignments.
+              lv_action = 'I'.
+              lv_leader = 'X'.
+              assign lwa_team_assign-t_insert_tl to &lt;lt_assign&gt;.
+
+          endcase.
+
+          "Skip if there are no insertions or deletions.
+          if &lt;lt_assign&gt; is initial.
+            continue.
+          endif.
+
+          read table lt_teams_all into lwa_teams
+            with key
+              team_id = lwa_team_assign-team_id.
+          if sy-subrc = 0.
+
+            append lwa_teams to lt_teams.
+
+          endif.
+
+          clear:
+            lt_users.
+
+          "Set the Team assignments Deleted/Inserted for the User.
+          loop at &lt;lt_assign&gt; into lwa_assign.
+
+            "Set the Delete/Insert action and Team Leader for the User.
+            lwa_users-user_id   = lwa_assign-user_id.
+            lwa_users-action    = lv_action.
+            lwa_users-is_leader = lv_leader.
+            append lwa_users to lt_users.
+
+            case lv_action.
+              when 'D'.
+                message i012 with lwa_users-user_id lwa_teams-team_id into lwa_msg-context-value.
+              when 'I'.
+
+                case lv_leader.
+                  when ''.
+                    message i013 with lwa_users-user_id lwa_teams-team_id into lwa_msg-context-value.
+                  when 'X'.
+                    message i014 with lwa_users-user_id lwa_teams-team_id into lwa_msg-context-value.
+                endcase.
+
+            endcase.
+
+            move-corresponding sy to lwa_msg.
+            append lwa_msg to lt_msg_dtl.
+
+          endloop.
+
+          "Update the user/team assignments.
+          try.
+
+              call method cl_uje_team=&gt;update_teams
+                exporting
+                  it_teams    = lt_teams
+                  it_users    = lt_users
+                  i_appset_id = p_appset.
+
+            catch cx_uj_no_auth .
+            catch cx_uje_exception .
+          endtry.
+
+          "In the case of deletion, execute the deletion twice.
+          if lv_action = 'D'.
+
+            "This is done to delete assignments with Team Leaders flagged.
+            try.
+
+<font color ="#0000FF">*/ Note that where there is a Team Leader assignment the deletion</font>
+<font color ="#0000FF">*  indicator will delete the Team Leader flag but retain the</font>
+<font color ="#0000FF">*  Team assignment, we have to execute the update a second time</font>
+<font color ="#0000FF">*  to delete the Team assignment completely.</font>
+
+                call method cl_uje_team=&gt;update_teams
+                  exporting
+                    it_teams    = lt_teams
+                    it_users    = lt_users
+                    i_appset_id = p_appset.
+
+              catch cx_uj_no_auth .
+              catch cx_uje_exception .
+            endtry.
+
+          endif.
+
+        enddo.
+
+      endloop.
+
+    endif.
+
+    if p_user = 'X'.
+
+      loop at lt_user_assign into lwa_user_assign.
+
+        lv_idx = sy-tabix.
+
+        "Calculate progress.
+        lv_float = ( lv_idx / lines( lt_user_assign ) ) * 100.
+        lv_pct = lv_float.
+
+        "Define progress message.
+        lv_mtext = |Updating Teams for User { lwa_user_assign-user_id } ({ lv_pct }%)|.
+
+        "Output progress message.
+        call function 'SAPGUI_PROGRESS_INDICATOR'
+          exporting
+            percentage = lv_pct
+            text       = lv_mtext.
+
+        do 3 times.
+
+          clear:
+            lt_users.
+
+          case sy-index.
+            when 1.
+
+              "First delete Team assignments.
+              lv_action = 'D'.
+              lv_leader = ''.
+              assign lwa_user_assign-t_delete to &lt;lt_assign&gt;.
+
+            when 2.
+
+              "Second insert Team assignments.
+              lv_action = 'I'.
+              lv_leader = ''.
+              assign lwa_user_assign-t_insert to &lt;lt_assign&gt;.
+
+            when 3.
+
+              "Second insert Team Leader assignments.
+              lv_action = 'I'.
+              lv_leader = 'X'.
+              assign lwa_user_assign-t_insert_tl to &lt;lt_assign&gt;.
+
+          endcase.
+
+          "Skip if there are no insertions or deletions.
+          if &lt;lt_assign&gt; is initial.
+            continue.
+          endif.
+
+          "Set the Delete/Insert action and Team Leader for the User.
+          lwa_users-user_id   = lwa_user_assign-user_id.
+          lwa_users-action    = lv_action.
+          lwa_users-is_leader = lv_leader.
+          append lwa_users to lt_users.
+
+          clear:
+            lt_teams.
+
+          "Set the Team assignments Deleted/Inserted for the User.
+          loop at &lt;lt_assign&gt; into lwa_assign.
+
+            read table lt_teams_all into lwa_teams
+              with key
+                team_id = lwa_assign-team_id.
+            if sy-subrc = 0.
+
+              append lwa_teams to lt_teams.
+
+            endif.
+
+            case lv_action.
+              when 'D'.
+                message i012 with lwa_users-user_id lwa_teams-team_id into lwa_msg-context-value.
+              when 'I'.
+
+                case lv_leader.
+                  when ''.
+                    message i013 with lwa_users-user_id lwa_teams-team_id into lwa_msg-context-value.
+                  when 'X'.
+                    message i014 with lwa_users-user_id lwa_teams-team_id into lwa_msg-context-value.
+                endcase.
+
+            endcase.
+
+            move-corresponding sy to lwa_msg.
+            append lwa_msg to lt_msg_dtl.
+
+          endloop.
+
+          "Update the user/team assignments.
+          try.
+
+              call method cl_uje_team=&gt;update_teams
+                exporting
+                  it_teams    = lt_teams
+                  it_users    = lt_users
+                  i_appset_id = p_appset.
+
+            catch cx_uj_no_auth .
+            catch cx_uje_exception .
+          endtry.
+
+          "In the case of deletion, execute the deletion twice.
+          if lv_action = 'D'.
+
+            "This is done to delete assignments with Team Leaders flagged.
+            try.
+
+<font color ="#0000FF">*/ Note that where there is a Team Leader assignment the deletion</font>
+<font color ="#0000FF">*  indicator will delete the Team Leader flag but retain the</font>
+<font color ="#0000FF">*  Team assignment, we have to execute the update a second time</font>
+<font color ="#0000FF">*  to delete the Team assignment completely.</font>
+
+                call method cl_uje_team=&gt;update_teams
+                  exporting
+                    it_teams    = lt_teams
+                    it_users    = lt_users
+                    i_appset_id = p_appset.
+
+              catch cx_uj_no_auth .
+              catch cx_uje_exception .
+            endtry.
+
+          endif.
+
+        enddo.
+
+      endloop.
+
+    endif.
+
+  endif.
+
+  append lines of lt_msg_dtl to lt_msg.
+
+  "Output messages before exit.
+  loop at lt_msg into lwa_msg.
+
+    case lwa_msg-msgty.
+      when 'E'.
+        lv_pfix = '@0A@'.
+      when 'W'.
+        lv_pfix = '@09@'.
+      when 'I'.
+        lv_pfix = '@08@'.
+    endcase.
+
+    if lwa_msg is initial.
+      skip 1.
+      continue.
+    endif.
+
+    if lwa_msg-context-value(1) = '@'.
+      lv_mtext = |{ lwa_msg-context-value }|.
+    else.
+      lv_mtext = |{ lv_pfix } { lwa_msg-context-value }|.
+    endif.
+
+    write: / lv_mtext hotspot.
+
+  endloop.
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* OPT Options</font>
+<font color ="#0000FF">* SEL Selection</font>
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_APPSET D       .</font>
+<font color ="#0000FF">* P_COMMIT         Commit changes</font>
+<font color ="#0000FF">* P_FILENM         File</font>
+<font color ="#0000FF">* P_NOCHK         Skip file validation</font>
+<font color ="#0000FF">* P_TEAM         Update by Team</font>
+<font color ="#0000FF">* P_USER         Update by User</font>
+
+
+<font color ="#0000FF">*Messages</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">* Message class: Hard coded</font>
+<font color ="#0000FF">*   Invalid Environment</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">* Message class: LWA_MSG-MSGID</font>
+<font color ="#0000FF">*LWA</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">* Message class: ZX_BWU_BMUM</font>
+<font color ="#0000FF">*003   Invalid Team '&1' at line '&2'.</font>
+<font color ="#0000FF">*004   Invalid Team(s) in file.</font>
+<font color ="#0000FF">*005   Invalid User '&1' at line '&2'.</font>
+<font color ="#0000FF">*006   Invalid User(s) in file.</font>
+<font color ="#0000FF">*007   Invalid Team Leader flag '&1' at line '&2'.</font>
+<font color ="#0000FF">*008   Invalid Team Leader flag(s) in file.</font>
+<font color ="#0000FF">*009   Invalid Action '&1' at line '&2'.</font>
+<font color ="#0000FF">*010   Invalid Action(s) in file.</font>
+<font color ="#0000FF">*011   No errors found in Team to User assignment</font>
+<font color ="#0000FF">*012   @18@ User '&1' assignment to Team '&2' removed</font>
+<font color ="#0000FF">*013   @17@ User '&1' assignment to Team '&2' added</font>
+<font color ="#0000FF">*014   @17@ User '&1' assignment to Team '&2' added (Team Leader)</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_BEX_CLEAR_OLAP_CACHE</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_BEX_CLEAR_OLAP_CACHE</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Clear BEx Cache</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_BEX_CLEAR_OLAP_CACHE</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This program can be used to clear the OLAP (BEx) cache. This</font>
+<font color ="#0000FF">*&  is useful for unit testing performance and should never be used</font>
+<font color ="#0000FF">*&  in production.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_bex_clear_olap_cache.
+
+start-of-selection.
+
+  data:
+    lo_cache_storage               type ref to cl_rsr_cache_storage,
+    lv_success                     type rs_bool.
+
+  data:
+    lwa_cache_data_b               type rsr_cache_data_b,
+    lt_cache_data_b                type table of rsr_cache_data_b,
+    lwa_mdx_ui_model               type rsr_mdx_ui_model,
+    lt_mdx_ui_model                type table of rsr_mdx_ui_model,
+    lv_str                         type string.
+
+  call method cl_rsr_cache_storage=&gt;create
+    exporting
+      i_cache_type      = ''
+<font color ="#0000FF">*     i_readmode        =</font>
+<font color ="#0000FF">*     i_s_debugflags    =</font>
+    receiving
+      r_r_cache_storage = lo_cache_storage.
+
+  call method lo_cache_storage-&gt;if_rsr_cache_storage~delete_cache
+    receiving
+      r_success = lv_success.
+
+  return.
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

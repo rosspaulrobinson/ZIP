@@ -1,0 +1,129 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>ZSMN_BWU_BCMD</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: ZSMN_BWU_BCMD</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Copy BPC master data to BW Characteristics</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  ZSMN_BWU_BCMD</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report zsmn_bwu_bcmd message-id zx_bpc_bcmd.
+
+data:
+  gv_iobjnm type rsiobjnm.
+
+selection-screen begin of block b1 with frame title text-obj.
+
+select-options s_iobjnm for gv_iobjnm obligatory default 'ZXXXXXXX'.
+
+selection-screen end of block b1.
+
+selection-screen begin of block b2 with frame title text-opt.
+
+parameters p_attr   type rs_bool default rs_c_true.
+parameters p_text   type rs_bool default rs_c_true.
+parameters p_acti   type rs_bool default rs_c_true.
+
+selection-screen end of block b2.
+
+start-of-selection.
+
+  data:
+    lv_index                       type i,
+    lv_lines                       type i,
+    lv_iobjnm                      type rsiobjnm,
+    lt_iobjnm                      type table of rsiobjnm,
+    lt_dv_iobjnm                   type table of rsiobjnm,
+    lr_copy_md                     type ref to zcl_xot_bpc_copy_md_to_bw,
+    lv_percentage                  type f,
+    lv_text                        type string.
+
+  "Retrieve InfoObjects in selection.
+  select chanm
+    into table lt_iobjnm
+    from rsdcha
+    where chanm in s_iobjnm and
+          objvers = rs_c_objvers-active.
+
+  lv_lines = lines( lt_iobjnm ).
+
+  if lv_lines = 0.
+    message s008. return.
+  endif.
+
+  "Process each InfoObject.
+  loop at lt_iobjnm into lv_iobjnm.
+
+    "Set the Index.
+    lv_index = sy-tabix.
+
+    "Clear variables for each loop.
+    clear:
+      lt_dv_iobjnm,
+      lr_copy_md.
+
+    "Set the progress indicator parameters.
+    lv_percentage = ( ( lv_index / lv_lines ) * 100 ).
+    lv_text = |{ lv_index } of { lines( lt_iobjnm ) }: Copying master data for '{ lv_iobjnm }'.|.
+
+    "Output progress.
+    call function 'SAPGUI_PROGRESS_INDICATOR'
+      exporting
+        percentage = lv_percentage
+        text       = lv_text.
+
+    "Add InfoObject to selection.
+    append lv_iobjnm to lt_dv_iobjnm.
+
+    "Instatiate a new instance of the copy master data class.
+    call method zcl_xot_bpc_copy_md_to_bw=&gt;factory
+      exporting
+        it_dv_iobjnm = lt_dv_iobjnm
+        if_copy_attr = p_attr
+        if_copy_text = p_text
+        if_activate  = p_acti
+      importing
+        er_copy_md   = lr_copy_md.
+
+    "Copy master data.
+    lr_copy_md-&gt;execute( ).
+
+  endloop.
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* ARE Select InfoArea for Characteristics</font>
+<font color ="#0000FF">* CTG Select InfoObject Catalogue</font>
+<font color ="#0000FF">* OBJ Select Characteristics</font>
+<font color ="#0000FF">* OPT Options</font>
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_ACTI         Activate master data</font>
+<font color ="#0000FF">* P_ATTR         Copy Attributes</font>
+<font color ="#0000FF">* P_TEXT         Copy Texts</font>
+<font color ="#0000FF">* S_IOBJNM         InfoObjects</font>
+
+
+<font color ="#0000FF">*Messages</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">* Message class: ZX_BPC_BCMD</font>
+<font color ="#0000FF">*008   No Characteristics are in the selection.</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_BW_ACTIV_DTPA</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_BW_ACTIV_DTPA</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Activate DTPs</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_BW_ACTIV_DTPA</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This program enables the activation of a list of DTPs. The</font>
+<font color ="#0000FF">*&  select-options parameter does not support patterns.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_bw_activ_dtpa.
+
+load-of-program.
+
+  tables:
+    rsbkdtp.
+
+  selection-screen begin of block b1 with frame title _title_1.
+  select-options s_dtpa for rsbkdtp-dtp no intervals.
+  selection-screen end of block b1.
+
+initialization.
+
+  _title_1 = 'Selection'.
+
+  %_s_dtpa_%_app_%-text = 'DTPs'.
+
+  type-pools:
+    sscr,
+    slis.
+
+  data:
+    lwa_opt_list                   type sscr_opt_list,
+    lwa_ass                        type sscr_ass,
+    lwa_restriction                type sscr_restrict.
+
+  lwa_opt_list-name       = 'EQ_ONLY'.
+  lwa_opt_list-options-eq = 'X'.
+
+  append lwa_opt_list to lwa_restriction-opt_list_tab.
+
+  lwa_ass-name    = 'S_DTPA'.
+  lwa_ass-kind    = 'S'.
+  lwa_ass-sg_main = 'I'.
+  lwa_ass-sg_addy = ''.
+  lwa_ass-op_main = 'EQ_ONLY'.
+
+  append lwa_ass to lwa_restriction-ass_tab.
+
+  call function 'SELECT_OPTIONS_RESTRICT'
+    exporting
+      restriction = lwa_restriction.
+
+start-of-selection.
+
+  data:
+    lo_dtp                         type ref to cl_rsbk_dtp,
+    lv_subrc                       type i,
+    lv_mtext                       type string.
+
+  sort s_dtpa[].
+  delete adjacent duplicates from s_dtpa[].
+
+  loop at s_dtpa.
+
+    call method cl_rsbk_dtp=&gt;factory
+      exporting
+        i_dtp   = s_dtpa-low
+      receiving
+        r_r_dtp = lo_dtp.
+
+    call method lo_dtp-&gt;if_rso_tlogo_maintain~activate
+      importing
+        e_subrc = lv_subrc.
+
+    if lv_subrc &lt;&gt; 0.
+
+      lv_mtext = |Error activating { s_dtpa-low }|.
+      write: / lv_mtext.
+
+    endif.
+
+  endloop.
+
+  return.
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

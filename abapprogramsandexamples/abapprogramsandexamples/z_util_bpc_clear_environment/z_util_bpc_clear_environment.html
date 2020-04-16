@@ -1,0 +1,324 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_BPC_CLEAR_ENVIRONMENT</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_BPC_CLEAR_ENVIRONMENT</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Clear MD and TD from BPC model (before UJBR)</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_BPC_CLEAR_ENVIRONMENT</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This program can be used to clear down a BPC environment so that</font>
+<font color ="#0000FF">*&  it can be re-loaded from a UJBR file. To do this the program</font>
+<font color ="#0000FF">*&  clears the BW hierarchies, master data and transaction data, it</font>
+<font color ="#0000FF">*&  then clears the BPC classic dimension cache data. The result is</font>
+<font color ="#0000FF">*&  a completly clean environemnt. If this is not done when a restore</font>
+<font color ="#0000FF">*&  is executed, the restore will only overwrite existing data or</font>
+<font color ="#0000FF">*&  add new data that is in the file, it will not remove legacy data</font>
+<font color ="#0000FF">*&  not mentioned in the UJBR file.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_bpc_clear_environment.
+
+load-of-program.
+
+  types:
+    begin of ty_wa_appl,
+      appset_id	                   type uj_appset_id,
+      application_id               type uj_appl_id,
+      infocube                     type rsinfoprov,
+    end of ty_wa_appl.
+
+  types:
+    begin of ty_wa_dim,
+      dimension                    type uj_dim_name,
+      data_table                   type tabname,
+      iobjnm                       type rsiobjnm,
+    end of ty_wa_dim.
+
+  types:
+    begin of ty_wa_hier,
+      dimension                    type uj_dim_name,
+      iobjnm                       type rsiobjnm,
+      t_hieid                      type table of rshieid with non-unique key table_line,
+    end of ty_wa_hier.
+
+  data:
+    lv_appl_id                     type uj_appl_id,
+    lv_dimension                   type uj_dim_name,
+    lv_infocube                    type rsinfoprov,
+    lwa_appl                       type ty_wa_appl,
+    lt_appl                        type table of ty_wa_appl,
+    lwa_dim                        type ty_wa_dim,
+    lt_dim                         type table of ty_wa_dim,
+    lwa_hier                       type ty_wa_hier,
+    lt_hier                        type table of ty_wa_hier,
+    lv_iobjnm                      type rsiobjnm,
+    lv_hieid                       type rshieid,
+    lt_dv_hieid                    type table of rshieid,
+    lo_dta                         type ref to cl_rsd_dta,
+    lt_msg                         type rsdmd_t_balmi,
+    lv_result                      type i,
+    lv_mtext                       type string,
+    lv_jobname                     type btcjob,
+    lv_jobcount                    type btcjobcnt.
+
+  field-symbols:
+    &lt;lv_dim&gt;                       type ty_wa_dim,
+    &lt;lwa_hier&gt;                     type ty_wa_hier.
+
+  selection-screen begin of block b1 with frame title text-sel.
+  parameters p_env type uj_appset_id obligatory.
+  select-options s_mdl for lv_appl_id.
+  select-options s_dim for lv_dimension.
+  selection-screen end of block b1.
+
+  selection-screen begin of block b2 with frame title text-del.
+  parameters p_td type rs_bool default 'X'.
+  parameters p_hr type rs_bool default 'X'.
+  parameters p_md type rs_bool default 'X'.
+  parameters p_ch type rs_bool default 'X'.
+  selection-screen end of block b2.
+
+start-of-selection.
+
+  "Retrieve Models/InfoCubes in Environment.
+  select
+      appset_id
+      application_id
+      infocube
+    into table lt_appl
+    from uja_appl
+    where appset_id = p_env and
+          application_id in s_mdl.
+  if sy-subrc &lt;&gt; 0.
+    message 'No models in selection.' type 'S'.
+    return.
+  endif.
+
+  "Retrieve Dimension/InfoObjects in model.
+  select
+      dimension
+      data_table
+    into corresponding fields of table lt_dim ##TOO_MANY_ITAB_FIELDS
+    from uja_dimension
+    where appset_id = p_env and
+          dimension in s_dim.
+
+  "Loop through list of Dimensions.
+  loop at lt_dim assigning &lt;lv_dim&gt;.
+
+    "Convert table name to InfoObject name.
+    lv_iobjnm = &lt;lv_dim&gt;-data_table.
+    replace '/1CPMB/' in lv_iobjnm with '/CPMB/'.
+    &lt;lv_dim&gt;-iobjnm = lv_iobjnm.
+
+  endloop."Loop through list of Dimensions.
+
+  "Loop through list of InfoObjects.
+  loop at lt_dim into lwa_dim.
+
+    lwa_hier-dimension = lwa_dim-dimension.
+    lwa_hier-iobjnm    = lwa_dim-iobjnm.
+    append lwa_hier to lt_hier assigning &lt;lwa_hier&gt;.
+
+    "Retrieve hierarchies for InfoObject.
+    select
+        hieid
+      into table &lt;lwa_hier&gt;-t_hieid
+      from rshiedir
+      where iobjnm = lwa_dim-iobjnm and
+            objvers = 'A'.
+
+  endloop. "Loop through list of InfoObjects.
+
+  "If transaction data is flagged for deletion.
+  if p_td = rs_c_true.
+
+    "Loop through InfoCube list.
+    loop at lt_appl into lwa_appl."lt_dv_infocube into lv_infocube.
+
+      "Create instance of InfoCube.
+      cl_rsd_dta=&gt;factory( exporting i_infoprov = lwa_appl-infocube receiving r_r_dta = lo_dta exceptions not_found  = 1 others = 2 ).
+
+      "Drop InfoCube data.
+      lo_dta-&gt;delete_data( exporting i_with_dialog = ' ' i_incl_dime = 'X' i_force_new_log = ' ' exceptions cancelled = 1 not_found = 2 failed = 3 others = 4 ).
+
+      if sy-subrc &lt;&gt; 0.
+        lv_mtext = |Data in Model '{ lwa_appl-application_id }' could not be deleted.|.
+      else.
+        lv_mtext = |Data in Model '{ lwa_appl-application_id }' deleted.|.
+      endif.
+
+      write: / lv_mtext.
+      message lv_mtext type 'S'.
+
+    endloop. "Loop through InfoCube list.
+
+  endif. "Transaction data is flagged for deletion.
+
+  "If hierarchy data is flagged for deletion.
+  if p_hr = rs_c_true.
+
+    "Loop through hierarchy list.
+    loop at lt_hier into lwa_hier.
+
+      loop at lwa_hier-t_hieid into lv_hieid.
+
+        "Delete hierarchy.
+        call function 'RSSH_HIERARCHY_DELETE'
+          exporting
+            i_hieid                = lv_hieid
+          exceptions
+            name_error             = 1
+            iobj_not_found         = 2
+            hierarchy_not_found    = 3
+            hierarchy_delete_error = 4
+            foreign_lock           = 5
+            no_authority           = 6
+            others                 = 7.
+        if sy-subrc &lt;&gt; 0.
+          lv_mtext = |Hierarchy '{ lv_hieid }' for Dimension '{ lwa_hier-dimension }' could not be deleted.|.
+        else.
+          lv_mtext = |Hierarchy '{ lv_hieid }' for Dimension '{ lwa_hier-dimension }' deleted.|.
+        endif.
+
+        write: / lv_mtext.
+        message lv_mtext type 'S'.
+
+      endloop.
+
+    endloop. "Loop through hierarchy list.
+
+  endif. "Hierarchy data is flagged for deletion.
+
+
+  "If master data is flagged for deletion.
+  if p_md = rs_c_true.
+
+    "Loop through InfoObject list.
+    loop at lt_dim into lwa_dim.
+
+      "Delete all master data.
+      call function 'RSDMDD_DELETE_MASTER_DATA'
+        exporting
+          i_iobjnm            = lwa_dim-iobjnm
+          i_flag_delete_all   = rs_c_true
+          i_flag_delete_sids  = rs_c_true
+          i_flag_dialog       = rs_c_false
+          i_flag_delete_texts = rs_c_true
+        importing
+          e_t_msg             = lt_msg
+          e_result            = lv_result.
+      if lv_result &lt;&gt; 0 and lt_msg is not initial.
+        lv_mtext = |Master data for Dimenson '{ lwa_dim-dimension }' could not be deleted.|.
+      else.
+        lv_mtext = |Master data for Dimenson '{ lwa_dim-dimension }' deleted.|.
+      endif.
+
+      write: / lv_mtext.
+      message lv_mtext type 'S'.
+
+    endloop. "Loop through InfoObject list.
+
+  endif. "Master data is flagged for deletion.
+
+  "If BPC Dimension Cache is flagged for deletion.
+  if p_ch = rs_c_true.
+
+    "Loop through InfoObject list.
+    loop at lt_dim into lwa_dim.
+
+      lv_jobname = |Z_DIM_CACHE_{ lwa_dim-dimension }|.
+
+      call function 'JOB_OPEN'
+        exporting
+          jobname          = lv_jobname
+        importing
+          jobcount         = lv_jobcount
+        exceptions
+          cant_create_job  = 1
+          invalid_job_data = 2
+          jobname_missing  = 3
+          others           = 4.
+      if sy-subrc &lt;&gt; 0.
+        continue.
+      else.
+
+        submit uja_refresh_dim_cache
+          via job lv_jobname number lv_jobcount
+          with p_appset = p_env
+          with p_dim    = lwa_dim-dimension
+          with p_templ  = rs_c_false
+          with p_regen  = rs_c_true
+          with p_all    = rs_c_false
+          and return.
+
+        call function 'JOB_CLOSE'
+          exporting
+            jobcount             = lv_jobcount
+            jobname              = lv_jobname
+            strtimmed            = rs_c_true
+          exceptions
+            cant_start_immediate = 1
+            invalid_startdate    = 2
+            jobname_missing      = 3
+            job_close_failed     = 4
+            job_nosteps          = 5
+            job_notex            = 6
+            lock_failed          = 7
+            invalid_target       = 8
+            others               = 9.
+        if sy-subrc &lt;&gt; 0.
+          lv_mtext = |Clear cache for Dimension '{ lwa_dim-dimension }' could not be scheduled.|.
+        else.
+          lv_mtext = |Clear cache for Dimension '{ lwa_dim-dimension }' scheduled as job '{ lv_jobname }'.|.
+        endif.
+
+        write: / lv_mtext.
+        message lv_mtext type 'S'.
+
+      endif. "Job opened succesfully.
+
+    endloop. "Loop through InfoObject list.
+
+  endif. "BPC Dimension Cache is flagged for deletion.
+
+  return.
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* DEL Select data types for deletion</font>
+<font color ="#0000FF">* SEL Select Environment</font>
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_CH         BPC Dimension Cache</font>
+<font color ="#0000FF">* P_ENV         Environment</font>
+<font color ="#0000FF">* P_HR         Hierarchy data</font>
+<font color ="#0000FF">* P_MD         Master data</font>
+<font color ="#0000FF">* P_TD         Transaction data</font>
+<font color ="#0000FF">* S_DIM         Dimension</font>
+<font color ="#0000FF">* S_MDL         Model</font>
+
+
+<font color ="#0000FF">*Messages</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">*YPE</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">* Message class: Hard coded</font>
+<font color ="#0000FF">*   No models in selection.</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

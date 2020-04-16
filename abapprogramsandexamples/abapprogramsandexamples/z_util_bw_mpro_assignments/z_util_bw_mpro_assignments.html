@@ -1,0 +1,551 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_BW_MPRO_ASSIGNMENTS</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_BW_MPRO_ASSIGNMENTS</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Transpose MultiProvider Assignments</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_BW_MPRO_ASSIGNMENTS</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This program allows you to see where MultiProvider assignments</font>
+<font color ="#0000FF">*&  are not consistant. For large MultiProviders with semantic</font>
+<font color ="#0000FF">*&  partitioning this can help you identify potential issues. This</font>
+<font color ="#0000FF">*&  can also be useful in instances where Navigational Attributes</font>
+<font color ="#0000FF">*&  are assigned to characteristics.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_bw_mpro_assignments.
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl DEFINITION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl definition.
+
+  public section.
+
+    types:
+      begin of ty_wa_param,
+        p_mpro                     type rsinfoprov,
+        s_ppro                     type range of rsinfoprov,
+        s_iobj                     type range of rsiobjnm,
+      end of ty_wa_param.
+
+    class-data:
+      wa_param                     type ty_wa_param.
+
+    class-methods factory
+      importing
+        iwa_param type ty_wa_param
+      exporting
+        er_lcl    type ref to lcl.
+
+    methods execute.
+
+  private section.
+
+    data:
+      wa_dta                       type rsd_s_dta,
+      t_pro                        type rsd_t_dta_pro,
+      t_part                       type rsdo_t_dta_r,
+      t_iobj_ident                 type rsd_t_mpro_iobj_ident.
+
+    data:
+      t_components                 type abap_component_tab,
+      r_wa_data                    type ref to data,
+      r_t_data                     type ref to data.
+
+    methods get_meta_data.
+
+    methods create_internal_table.
+
+    methods transpose_mpro_assignments.
+
+    methods set_match_flag.
+
+    methods output.
+
+endclass.                    "lcl DEFINITION
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl IMPLEMENTATION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl implementation.
+
+  method factory.
+
+    "Create instance of class.
+    create object er_lcl type lcl.
+
+    "Persist import parameter data.
+    er_lcl-&gt;wa_param = iwa_param.
+
+  endmethod.                    "factory
+
+  method execute.
+
+    get_meta_data( ).
+
+    create_internal_table( ).
+
+    "Transpose MultiProvider Assignments.
+    transpose_mpro_assignments( ).
+
+    "Set flag indicating matching assignments.
+    set_match_flag( ).
+
+    "Output data.
+    output( ).
+
+  endmethod.                    "execute
+
+  method get_meta_data.
+
+    data:
+      lo_rsd_dta                   type ref to cl_rsd_dta.
+
+    "Create an instance of the MultiProvider.
+    lo_rsd_dta = cl_rsd_dta=&gt;factory( wa_param-p_mpro ).
+
+    "Retrieve the meta-data for the MultiProvider.
+    call method lo_rsd_dta-&gt;dta_get_info
+      exporting
+        i_with_atr_nav     = 'X'
+      importing
+        e_s_dta            = wa_dta
+        e_t_dta_pro        = t_pro
+        e_t_dta_part       = t_part
+        e_t_dta_iobj_ident = t_iobj_ident.
+
+    delete t_part where partprov not in wa_param-s_ppro.
+    delete t_pro where iobjnm not in wa_param-s_iobj.
+
+    delete t_iobj_ident where partprov not in wa_param-s_ppro.
+    delete t_iobj_ident where iobjnm not in wa_param-s_iobj.
+
+  endmethod.                    "get_meta_data
+
+  method create_internal_table.
+
+    data:
+      lwa_part                     type rsdo_s_dta_r.
+
+    data:
+      ls_component                 type abap_componentdescr,
+      lt_components                type abap_component_tab,
+      lo_structdescr               type ref to cl_abap_structdescr,
+      lo_tabledescr                type ref to cl_abap_tabledescr.
+
+    "create the static columns
+    ls_component-type ?= cl_abap_datadescr=&gt;describe_by_name( 'RSIOBJNM' ).
+    ls_component-name  = 'IOBJNM'.
+    append ls_component to t_components.
+
+    ls_component-type ?= cl_abap_datadescr=&gt;describe_by_name( 'RSTXTLG' ).
+    ls_component-name  = 'TXTLG'.
+    append ls_component to t_components.
+
+    ls_component-type ?= cl_abap_datadescr=&gt;describe_by_name( 'ICON_D' ).
+    ls_component-name  = 'IOBJTP'.
+    append ls_component to t_components.
+
+    ls_component-type ?= cl_abap_datadescr=&gt;describe_by_name( 'ICON_D' ).
+    ls_component-name  = 'MATCH'.
+    append ls_component to t_components.
+
+    loop at t_part into lwa_part.
+
+      ls_component-type ?= cl_abap_datadescr=&gt;describe_by_name( 'RSINFOPROV' ).
+      ls_component-name  = lwa_part-partprov.
+      append ls_component to t_components.
+
+    endloop.
+
+    "create the structure and table for the display
+    try.
+
+        lo_structdescr = cl_abap_structdescr=&gt;create( t_components ).
+        lo_tabledescr  = cl_abap_tabledescr=&gt;create( lo_structdescr ).
+
+      catch cx_sy_struct_creation.
+        message 'Unable to create structure.' type 'E'.
+        return.
+      catch cx_sy_table_creation.
+        message 'Unable to create table.' type 'E'.
+        return.
+    endtry.
+
+    create data r_wa_data type handle lo_structdescr.
+    create data r_t_data type handle lo_tabledescr.
+
+  endmethod.                    "create_internal_table
+
+  method transpose_mpro_assignments.
+
+    data:
+      lwa_dta                      type rsd_s_dta,
+      lwa_pro                      type rsd_s_dta_pro,
+      lwa_part                     type rsdo_s_dta_r,
+      lwa_iobj_ident               type rsd_s_mpro_iobj_ident,
+      lv_partiobj                  type rsiobjnm,
+      lv_index                     type syindex.
+
+    field-symbols:
+      &lt;lv_partiobj&gt;                type any,
+      &lt;l_data&gt;                     type any,
+      &lt;ls_data&gt;                    type any,
+      &lt;lt_data&gt;                    type standard table.
+
+    assign r_wa_data-&gt;* to &lt;ls_data&gt;.
+    assign r_t_data-&gt;* to &lt;lt_data&gt;.
+
+    "Populate the assignments
+    loop at t_iobj_ident into lwa_iobj_ident.
+
+      read table &lt;lt_data&gt; assigning &lt;ls_data&gt;
+        with key
+          ('IOBJNM') = lwa_iobj_ident-iobjnm.
+      if sy-subrc &lt;&gt; 0.
+        append initial line to &lt;lt_data&gt; assigning &lt;ls_data&gt;.
+      endif.
+
+      assign component 'IOBJNM' of structure &lt;ls_data&gt; to &lt;l_data&gt;.
+      if sy-subrc = 0.
+        &lt;l_data&gt; = lwa_iobj_ident-iobjnm.
+      endif.
+
+      assign component 'TXTLG' of structure &lt;ls_data&gt; to &lt;l_data&gt;.
+      if sy-subrc = 0.
+        &lt;l_data&gt; = lwa_iobj_ident-txtlg.
+      endif.
+
+      assign component 'IOBJTP' of structure &lt;ls_data&gt; to &lt;l_data&gt;.
+      if sy-subrc = 0.
+
+        if lwa_iobj_ident-iobjnm cp '*__*'.
+          &lt;l_data&gt; = 'NAV'.
+        else.
+          &lt;l_data&gt; = lwa_iobj_ident-iobjtp.
+        endif.
+      endif.
+    endloop.
+
+    "Populate the assignments
+    loop at t_iobj_ident into lwa_iobj_ident.
+
+      read table &lt;lt_data&gt; assigning &lt;ls_data&gt;
+        with key
+          ('IOBJNM') = lwa_iobj_ident-iobjnm.
+
+      check sy-subrc = 0.
+
+      assign component lwa_iobj_ident-partprov of structure &lt;ls_data&gt; to &lt;lv_partiobj&gt;.
+      if sy-subrc = 0.
+        &lt;lv_partiobj&gt; = lwa_iobj_ident-partiobj.
+      endif.
+
+    endloop.
+    sort &lt;lt_data&gt; by ('IOBJTP') ('IOBJNM').
+
+  endmethod.                    "transpose_mpro_assignments
+
+  method set_match_flag.
+
+    data:
+      lv_partiobj                  type rsiobjnm,
+      lv_index                     type syindex.
+
+    data:
+      ls_component                 type abap_componentdescr,
+      lt_components                type abap_component_tab.
+
+    field-symbols:
+      &lt;lv_partiobj&gt;                type any,
+      &lt;lv_match&gt;                   type any,
+      &lt;ls_data&gt;                    type any,
+      &lt;lt_data&gt;                    type standard table.
+
+    assign r_wa_data-&gt;* to &lt;ls_data&gt;.
+    assign r_t_data-&gt;* to &lt;lt_data&gt;.
+
+    "check matching assignments.
+    lt_components = t_components.
+
+    delete lt_components
+      where
+        name = 'IOBJNM' or
+        name = 'TXTLG'  or
+        name = 'IOBJTP' or
+        name = 'MATCH'.
+
+    loop at &lt;lt_data&gt; assigning &lt;ls_data&gt;.
+
+      assign component 'MATCH' of structure &lt;ls_data&gt; to &lt;lv_match&gt;.
+      if sy-subrc = 0.
+
+        "Set icon to 'Green Light'.
+        &lt;lv_match&gt; = '@5B@'.
+
+      endif.
+
+      if lines( lt_components ) &lt;&gt; 1.
+
+        loop at lt_components into ls_component.
+
+          lv_index = sy-tabix.
+
+          assign component ls_component-name of structure &lt;ls_data&gt; to &lt;lv_partiobj&gt;.
+          if sy-subrc = 0.
+
+            if lv_index = 1.
+              lv_partiobj = &lt;lv_partiobj&gt;.
+            else.
+              if lv_partiobj &lt;&gt; &lt;lv_partiobj&gt;.
+
+                "Set icon to 'Red Light'.
+                &lt;lv_match&gt; = '@5C@'.
+
+              endif.
+            endif.
+
+          endif.
+
+        endloop.
+
+      endif.
+
+    endloop.
+
+  endmethod.                    "set_match_flag
+
+  method output.
+
+    types:
+      begin of s_heading,
+        field             type char30,
+        txtsh             type scrtext_s,
+        txtmd             type scrtext_m,
+        txtlg             type scrtext_l,
+      end   of s_heading.
+
+    data:
+      lo_salv_table            type ref to cl_salv_table,
+      lo_columns               type ref to cl_salv_columns_table,
+      lo_column                type ref to cl_salv_column_table,
+      lo_functions             type ref to cl_salv_functions_list,
+      lo_display               type ref to cl_salv_display_settings,
+      l_title                  type lvc_title,
+      l_heading                type lvc_title.
+
+    data:
+      ls_component             type abap_componentdescr,
+      lt_components            type abap_component_tab,
+      lo_structdescr           type ref to cl_abap_structdescr,
+      lo_tabledescr            type ref to cl_abap_tabledescr.
+
+    data:
+      lt_col_txt               type table of s_heading,
+      ls_col_txt               type s_heading.
+
+    data:
+      ls_key                   type salv_s_layout_key,
+      lo_layout                type ref to cl_salv_layout.
+
+    data:
+      ls_data                  type ref to data,
+      lt_data                  type ref to data.
+
+    field-symbols:
+      &lt;l_data&gt;                 type any,
+      &lt;ls_data&gt;                type any,
+      &lt;lt_data&gt;                type any table.
+
+    "assign the imported data to the form object
+    assign r_t_data-&gt;* to &lt;lt_data&gt;.
+
+    l_title = `MultiProvider assignments for ` && wa_param-p_mpro.
+
+    try.
+
+        "create an instance of the alv grid class
+        call method cl_salv_table=&gt;factory
+          importing
+            r_salv_table = lo_salv_table
+          changing
+            t_table      = &lt;lt_data&gt;.
+
+        "set the alv grid parameter to allow saving of layout variants
+        lo_layout = lo_salv_table-&gt;get_layout( ).
+        ls_key-report = sy-repid.
+        lo_layout-&gt;set_key( ls_key ).
+        lo_layout-&gt;set_save_restriction( cl_salv_layout=&gt;restrict_none ).
+
+        "set the alv grid parameter to see standard functions
+        lo_functions = lo_salv_table-&gt;get_functions( ).
+        lo_functions-&gt;set_all( 'X' ).
+
+        "set the alv grid display options
+        lo_display = lo_salv_table-&gt;get_display_settings( ).
+        lo_display-&gt;set_striped_pattern( cl_salv_display_settings=&gt;false ).
+        lo_display-&gt;set_list_header( l_title ).
+
+        "get the column, and subsequently set the column headings
+        lo_columns = lo_salv_table-&gt;get_columns( ).
+        lo_columns-&gt;set_optimize( abap_true ).
+
+        lo_column ?= lo_columns-&gt;get_column( 'IOBJTP' ).
+        lo_column-&gt;set_icon( 'X' ).
+        lo_column-&gt;set_short_text( '@HO@' ).
+        lo_column-&gt;set_medium_text( '@HO@' ).
+        lo_column-&gt;set_long_text( '@HO@' ).
+
+        lo_column ?= lo_columns-&gt;get_column( 'MATCH' ).
+        lo_column-&gt;set_icon( 'X' ).
+        lo_column-&gt;set_short_text( '@46@' ).
+        lo_column-&gt;set_medium_text( '@46@' ).
+        lo_column-&gt;set_long_text( '@46@' ).
+
+        "set column heading to split infoprovider
+        create data ls_data like line of &lt;lt_data&gt;.
+        assign ls_data-&gt;* to &lt;ls_data&gt;.
+
+        lo_structdescr ?= cl_abap_structdescr=&gt;describe_by_data( &lt;ls_data&gt; ).
+        lt_components = lo_structdescr-&gt;get_components( ).
+
+        loop at lt_components into ls_component.
+
+          case ls_component-name.
+            when 'IOBJNM'.
+            when 'TXTLG'.
+            when 'IOBJTP'.
+            when 'MATCH'.
+            when others.
+
+              if strlen( ls_component-name ) = 5.
+                l_heading = `[` && ls_component-name && `]`.
+              else.
+                l_heading = ls_component-name.
+              endif.
+
+              lo_column ?= lo_columns-&gt;get_column( |{ ls_component-name }| ).
+              lo_column-&gt;set_short_text( |{ l_heading }| ).
+              lo_column-&gt;set_medium_text( |{ l_heading }| ).
+              lo_column-&gt;set_long_text( |{ l_heading }| ).
+          endcase.
+        endloop.
+
+        "display the InfoObject types as icons
+        loop at &lt;lt_data&gt; assigning &lt;ls_data&gt;.
+          assign component 'IOBJTP' of structure &lt;ls_data&gt; to &lt;l_data&gt;.
+          if sy-subrc = 0.
+            case &lt;l_data&gt;.
+              when 'CHA'.
+                &lt;l_data&gt; = '@81@'.
+              when 'TIM'.
+                &lt;l_data&gt; = '@1T@'.
+              when 'KYF'.
+                &lt;l_data&gt; = '@83@'.
+              when 'NAV'.
+                &lt;l_data&gt; = '@82@'.
+              when 'UNI'.
+                &lt;l_data&gt; = '@85@'.
+              when 'DPA'.
+                &lt;l_data&gt; = '@6O@'.
+            endcase.
+          endif.
+        endloop.
+
+        "display data in alv format
+        lo_salv_table-&gt;display( ).
+
+      catch cx_salv_not_found.
+      catch cx_salv_msg .
+    endtry.
+
+  endmethod.                    "output
+
+endclass.                    "lcl IMPLEMENTATION
+
+load-of-program.
+
+  data:
+    g_infoprov                     type rsinfoprov.
+
+  selection-screen begin of block sel with frame title _title_1.
+  parameter p_mpro type rsinfoprov default 'ZPA_MP01' visible length 18.
+  select-options s_ppro for g_infoprov.
+  select-options s_iobj for g_infoprov.
+  selection-screen end of block sel.
+
+initialization.
+
+  _title_1 = 'Selection'.
+
+  %_p_mpro_%_app_%-text = 'MultiProvider'.
+  %_s_ppro_%_app_%-text = 'PartProviders'.
+  %_s_iobj_%_app_%-text = 'InfoObjects'.
+
+  "... Set default selection variant based on username.
+  data:
+    l_report                 type rsvar-report,
+    l_variant                type rsvar-variant.
+
+  l_report  = sy-cprog.
+  l_variant = sy-uname.
+
+  call function 'RS_SUPPORT_SELECTIONS'
+    exporting
+      report               = l_report
+      variant              = l_variant
+    exceptions
+      variant_not_existent = 1
+      variant_obsolete     = 2
+      others               = 3.
+
+start-of-selection.
+
+  data:
+    lr_lcl                         type ref to lcl,
+    lwa_param                      type lcl=&gt;ty_wa_param.
+
+  "Transfer selection-screen parameters to a work area.
+  lwa_param-p_mpro = p_mpro.
+  lwa_param-s_ppro = s_ppro[].
+  lwa_param-s_iobj = s_iobj[].
+
+  "Create instance of class.
+  call method lcl=&gt;factory
+    exporting
+      iwa_param = lwa_param
+    importing
+      er_lcl    = lr_lcl.
+
+  "Execute class.
+  lr_lcl-&gt;execute( ).
+
+<font color ="#0000FF">*Text elements</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* OPT Options</font>
+<font color ="#0000FF">* SEL Selection</font>
+
+
+<font color ="#0000FF">*Messages</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">* Message class: Hard coded</font>
+<font color ="#0000FF">*   Unable to create structure.</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

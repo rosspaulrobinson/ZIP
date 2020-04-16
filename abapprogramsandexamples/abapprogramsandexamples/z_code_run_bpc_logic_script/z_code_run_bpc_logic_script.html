@@ -1,0 +1,134 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_CODE_RUN_BPC_LOGIC_SCRIPT</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_CODE_RUN_BPC_LOGIC_SCRIPT</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Demo running Logic Script for unit testing</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_CODE_RUN_BPC_LOGIC_SCRIPT</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This demo program can be used to run a BPC Classic logic script</font>
+<font color ="#0000FF">*&  via ABAP, this can be useful for unit testing. However if classes</font>
+<font color ="#0000FF">*&  are used a better method is to run the logic script as an ABAP</font>
+<font color ="#0000FF">*&  unit test script.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_code_run_bpc_logic_script.
+
+load-of-program.
+
+  data:
+    lv_selct                       type c length 256,
+    lv_lgxln                       type c length 256.
+
+  data:
+    lv_script                      type uj_string,
+    lv_appset                      type uj_appset_id,
+    lv_application                 type uj_appl_id,
+    lv_user                        type uj_user_id,
+    lv_dim                         type uj_dim_name,
+    lv_mbr                         type uj_dim_member,
+    lwa_cv                         type ujk_s_cv,
+    lt_cv                          type ujk_t_cv,
+    lwa_logic                      type ujk_s_script_logic_record,
+    lt_logic                       type ujk_t_script_logic_scripttable,
+    lv_module                      type uj_module_id.
+
+  data:
+    lt_lgx                         type ujk_t_script_logic_scripttable,
+    lv_fm_error_message            type uj_large_string,
+    lt_log                         type ujk_t_single_string,
+    lv_sp_warning                  type uj_flg,
+    lt_error_records               type ujf_t_recline,
+    lt_message                     type uj0_t_message,
+    lwa_wb_status                  type ujo_s_wb_status.
+
+  field-symbols:
+    &lt;lwa_cv&gt;                       type ujk_s_cv.
+
+  parameters p_appst type uj_appset_id default 'COUNCIL'.
+  parameters p_applc type uj_appl_id default 'C_BUDGET'.
+  parameters p_usrnm type uj_user_id default sy-uname.
+  select-options s_selct for lv_selct.
+  select-options s_lgscr for lv_lgxln.
+
+start-of-selection.
+
+  lv_appset = p_appst.
+  lv_application = p_applc.
+  lv_user = p_usrnm.
+
+  loop at s_selct.
+
+    lv_selct = s_selct-low.
+
+    split lv_selct at '=' into lv_dim lv_mbr.
+
+    lv_dim = condense( lv_dim ).
+    lv_mbr = condense( lv_mbr ).
+
+    read table lt_cv assigning &lt;lwa_cv&gt;
+      with table key
+        dim_upper_case = lv_dim.
+    if sy-subrc &lt;&gt; 0.
+
+      lwa_cv-dim_upper_case = lv_dim.
+      insert lwa_cv into table lt_cv assigning &lt;lwa_cv&gt;.
+
+    endif.
+
+    &lt;lwa_cv&gt;-dimension = lv_dim.
+    append lv_mbr to &lt;lwa_cv&gt;-member.
+
+  endloop.
+
+  loop at s_lgscr.
+
+    lv_lgxln = s_lgscr-low.
+
+    lwa_logic-original_line = sy-tabix.
+    lwa_logic-original_file = 'screen'.
+    lwa_logic-content = lv_lgxln.
+
+    append lwa_logic to lt_logic.
+
+  endloop.
+
+  call function 'UJK_SCRIPT_LOGIC_EXECUTE'
+    exporting
+      i_appset           = lv_appset
+      i_application      = lv_application
+      i_user             = lv_user
+      i_logic            = lt_logic
+      i_file_type        = 'LGX'
+      it_cv              = lt_cv
+      i_module           = lv_module
+      i_lgf              = '\ROOT\WEBFOLDERS\COUNCIL \ADMINAPP\C_BUDGET\TEST.LGF'
+<font color ="#0000FF">*     I_MODE             =</font>
+<font color ="#0000FF">*     I_KEYDATE          = SY-DATUM</font>
+<font color ="#0000FF">*     IS_BADI_PARAM      =</font>
+<font color ="#0000FF">*     I_SUPPRESS_ZERO    = ABAP_TRUE</font>
+    importing
+      et_lgx             = lt_lgx
+      e_fm_error_message = lv_fm_error_message
+      et_log             = lt_log
+      e_sp_warning       = lv_sp_warning
+      et_error_records   = lt_error_records
+      et_message         = lt_message
+      es_wb_status       = lwa_wb_status.
+
+  return.
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>ZPG_SCRATCHPAD_CLEANUP_UFJ_DOC</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: ZPG_SCRATCHPAD_CLEANUP_UFJ_DOC</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Clean-up BPC DataFiles</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  ZPG_SCRATCHPAD_CLEANUP_UFJ_DOC</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report zpg_scratchpad_cleanup_ufj_doc.
+
+data:
+  lwa_user                       type uj0_s_user,
+  lo_manager                     type ref to cl_ujf_file_service_mgr,
+  lv_prefix                      type ujf_doctree-docname,
+  lv_suffix                      type ujf_doctree-docname,
+  lt_suffix                      type table of ujf_doctree-docname,
+  lv_dirname                     type ujf_doctree-docname,
+  lv_docname                     type ujf_doc-docname,
+  lt_docname                     type table of ujf_doc-docname,
+  lo_root                        type ref to cx_root.
+
+lwa_user-user_id = '104087'.
+
+select
+    docname
+  into table lt_docname
+  from ujf_doc
+  where ( appset = 'COUNCIL' and
+        docname like '%C_BUDGET\DATAMANAGER\DATAFILES%' and
+        create_date &lt; '20180101' ) and
+        not (
+        docname like '%APP_VER\APP_VER.TXT' or
+        docname like '%LONG_TEXT, REF_AP_SCD, IDENTIFIER,STRATEGY,PROJ_IR,CAP_SCHED.TXT' or
+        docname like '%PPM_HIERARCHY_LOAD_DATA.TXT' or
+        docname like '%PROJECT ALLOC_INPUT AUDIT TRAIL CORRECTION JOURNAL_C010009  C020028.TXT' or
+        docname like '%REVERSAL IN PROJECT_ALLOC_AMOUNT TESTED IN INPUT SHEET_C010009.TXT' or
+        docname like '%DATAMANAGER\DATAFILES\FCST03_C04101_02.TXT'
+        ).
+
+call method cl_ujf_file_service_mgr=&gt;factory
+  exporting
+    is_user   = lwa_user
+    i_appset  = 'COUNCIL'
+  receiving
+    r_manager = lo_manager.
+
+break-point.
+
+loop at lt_docname into lv_docname.
+
+  try.
+
+      call method lo_manager-&gt;delete_document
+        exporting
+          i_docname = lv_docname.
+
+    catch cx_ujf_file_service_error into lo_root.
+  endtry.
+
+endloop.
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

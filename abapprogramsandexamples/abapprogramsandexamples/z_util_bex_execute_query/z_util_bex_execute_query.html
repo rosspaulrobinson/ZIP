@@ -1,0 +1,543 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_UTIL_BEX_EXECUTE_QUERY</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_UTIL_BEX_EXECUTE_QUERY</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Execute BEx query</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_UTIL_BEX_EXECUTE_QUERY</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&  This program can read the data in a BEx query and output it to an</font>
+<font color ="#0000FF">*&  ALV grid. It can thus be used for automating analysis on queries,</font>
+<font color ="#0000FF">*&  much like an APD but with a higher degree of control.</font>
+<font color ="#0000FF">*&  The program is greatly simplified and does not deal with variable</font>
+<font color ="#0000FF">*&  entry (although it could be extended to do so), it also assumes</font>
+<font color ="#0000FF">*&  a fixed format where characteristics are in rows and key figures</font>
+<font color ="#0000FF">*&  are in columns. The display of the characteristics should always be</font>
+<font color ="#0000FF">*&  either key or text but not both. Result rows should be supressed.</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_util_bex_execute_query.
+
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl DEFINITION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl definition.
+
+  public section.
+
+    types:
+      begin of ty_wa_param,
+        p_compid                   type rszcompid,
+      end of ty_wa_param.
+
+    class-data:
+      wa_param                     type ty_wa_param.
+
+    class-methods factory
+      importing
+        iwa_param type ty_wa_param
+      exporting
+        er_lcl    type ref to lcl.
+
+    methods execute.
+
+  private section.
+
+    types:
+      begin of ty_wa_query_detail,
+        t_eltdir                   type rzd1_t_eltdir,
+        t_elttxt                   type rzd1_t_elttxt,
+        t_eltprop                  type rzd1_t_eltprop,
+        t_eltprio                  type rzd1_t_eltprio,
+        t_eltattr                  type rzd1_t_eltattr,
+        t_eltxref                  type rzd1_t_eltxref,
+        t_compdir                  type rzd1_t_compdir,
+        t_compic                   type rzd1_t_compic,
+        t_changes                  type rzd1_t_changes,
+        t_select                   type rzd1_t_select,
+        t_range                    type rzd1_t_range,
+        t_calc                     type rzd1_t_calc,
+        t_cel                      type rzd1_t_cel,
+        t_globv                    type rzd1_t_globv,
+      end of ty_wa_query_detail,
+      ty_t_query_detail            type table of ty_wa_query_detail.
+
+    data:
+      wa_query_detail              type ty_wa_query_detail,
+      t_axis_info                  type rrws_thx_axis_info,
+      t_cell_data                  type rrws_t_cell,
+      t_axis_data                  type rrws_thx_axis_data,
+      t_txt_symbols                type rrws_t_text_symbols.
+
+    data:
+      r_wa_data                    type ref to data,
+      r_t_data                     type ref to data,
+      v_row_count                  type i,
+      v_col_count                  type i.
+
+    data:
+      lwa_axis_info                type rrws_sx_axis_info,
+      t_axis_chars                 type rrws_thx_axis_chars,
+      lwa_axis_chars               type rrws_sx_axis_chars.
+
+    data:
+      lwa_axis_data                type rrws_sx_axis_data,
+      lwa_col_data                 type rrws_sx_tuple,
+      t_col_data                   type rrws_tx_set,
+      t_row_data                   type rrws_tx_set.
+
+    methods get_query_detail.
+
+    methods execute_query.
+
+    methods create_table.
+
+    methods fill_table.
+
+    methods show_table.
+
+endclass.                    "lcl DEFINITION
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*       CLASS lcl IMPLEMENTATION</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">*----------------------------------------------------------------------*</font>
+class lcl implementation.
+
+  method factory.
+
+    "Create instance of class.
+    create object er_lcl type lcl.
+
+    "Persist import parameter data.
+    er_lcl-&gt;wa_param = iwa_param.
+
+  endmethod.                    "factory
+
+  method execute.
+
+    "Retrieve query detail.
+    get_query_detail( ).
+
+    "Execute query.
+    execute_query( ).
+
+    "Create an internal table for the query data.
+    create_table( ).
+
+    "Transpose the query data and fill the internal table.
+    fill_table( ).
+
+    "Show the query data.
+    show_table( ).
+
+  endmethod.                    "execute
+
+  method get_query_detail.
+
+    "Retrieve the definition for the query.
+    call function 'RSZ_0_DB_COMP_GET'
+      exporting
+        i_compid            = wa_param-p_compid
+        i_objvers           = rs_c_objvers-active
+      importing
+        e_t_eltdir          = wa_query_detail-t_eltdir
+        e_t_elttxt          = wa_query_detail-t_elttxt
+        e_t_eltprop         = wa_query_detail-t_eltprop
+        e_t_eltprio         = wa_query_detail-t_eltprio
+        e_t_eltattr         = wa_query_detail-t_eltattr
+        e_t_eltxref         = wa_query_detail-t_eltxref
+        e_t_compdir         = wa_query_detail-t_compdir
+        e_t_compic          = wa_query_detail-t_compic
+        e_t_changes         = wa_query_detail-t_changes
+        e_t_select          = wa_query_detail-t_select
+        e_t_range           = wa_query_detail-t_range
+        e_t_calc            = wa_query_detail-t_calc
+        e_t_cel             = wa_query_detail-t_cel
+        e_t_globv           = wa_query_detail-t_globv
+      exceptions
+        component_not_found = 1
+        others              = 2.
+
+  endmethod.                    "get_query_detail
+
+  method execute_query.
+
+    data:
+      lr_request                   type ref to cl_rsr_request,
+      lr_dataset                   type ref to cl_rsr_data_set,
+      lwa_var                      type rrx1_s_var,
+      lt_var                       type rrx1_t_var,
+      lv_warnings                  type rrk_warnings.
+
+    "Create an instance of a request to read query data.
+    create object lr_request
+      exporting
+        i_query    = wa_param-p_compid
+      exceptions
+        x_message  = 1
+        not_stored = 2
+        others     = 3.
+
+    check sy-subrc = 0.
+
+    "Set the variables.
+    if lt_var is not initial.
+
+      call method lr_request-&gt;variables_set
+        exporting
+          i_t_var   = lt_var
+          i_selscrn = rsr_c_selscrn-no_screen
+        exceptions
+          x_message = 8
+          others    = 1.
+
+    endif.
+
+    "Read the data.
+    call method lr_request-&gt;read_data
+      importing
+        e_warnings    = lv_warnings
+      exceptions
+        no_processing = 1
+        x_message     = 2
+        others        = 3.
+
+    check sy-subrc = 0.
+
+    lr_dataset = cl_rsr_data_set=&gt;get( i_r_request = lr_request ).
+    lr_dataset-&gt;refresh( i_version = 1 ).
+
+    "Transfer query data.
+    t_axis_info   = lr_dataset-&gt;n_sx_version_20a_1-axis_info.
+    t_cell_data   = lr_dataset-&gt;n_sx_version_20a_1-cell_data.
+    t_axis_data   = lr_dataset-&gt;n_sx_version_20a_1-axis_data.
+    t_txt_symbols = lr_dataset-&gt;n_sx_version_20a_1-txt_symbols.
+
+  endmethod.                    "execute_query
+
+  method create_table.
+
+    data:
+      lwa_axis_info                type rrws_sx_axis_info,
+      lt_axis_chars                type rrws_thx_axis_chars,
+      lwa_axis_chars               type rrws_sx_axis_chars.
+
+    data:
+      lwa_axis_data                type rrws_sx_axis_data,
+      lwa_col_data                 type rrws_sx_tuple.
+
+    data:
+      lr_typedescr                 type ref to cl_abap_typedescr,
+      lr_structdescr               type ref to cl_abap_structdescr,
+      lr_tabledescr                type ref to cl_abap_tabledescr,
+      lwa_component                type abap_componentdescr,
+      lt_component                 type abap_component_tab.
+
+    "Retrieve the axis information for columns.
+    read table t_axis_info into lwa_axis_info
+      with table key
+        axis = '001'.
+
+    t_axis_chars = lwa_axis_info-chars.
+
+    loop at t_axis_chars into lwa_axis_chars.
+
+      call method cl_abap_typedescr=&gt;describe_by_name
+        exporting
+          p_name         = 'RSCHAVL'
+        receiving
+          p_descr_ref    = lr_typedescr
+        exceptions
+          type_not_found = 1
+          others         = 2.
+
+      lwa_component-name = |CHA_{ lwa_axis_chars-chanm }|.
+      lwa_component-type ?= lr_typedescr.
+
+      append lwa_component to lt_component.
+
+    endloop.
+
+    v_row_count = lines( lwa_axis_info-chars ).
+
+    "Retrieve the axis describing the columns
+    read table t_axis_data into lwa_axis_data
+      with table key
+        axis = '000'.
+
+    t_col_data = lwa_axis_data-set.
+
+    "Retrieve the axis describing the columns
+    read table t_axis_data into lwa_axis_data
+      with table key
+        axis = '001'.
+
+    t_row_data = lwa_axis_data-set.
+
+    "Create a component list.
+    loop at t_col_data into lwa_col_data.
+
+      call method cl_abap_typedescr=&gt;describe_by_name
+        exporting
+          p_name         = 'RRTFMTVALUE'
+        receiving
+          p_descr_ref    = lr_typedescr
+        exceptions
+          type_not_found = 1
+          others         = 2.
+
+      lwa_component-name = |KYF_{ lwa_col_data-tuple_ordinal }|.
+      lwa_component-type ?= lr_typedescr.
+
+      append lwa_component to lt_component.
+
+    endloop.
+
+    v_col_count = lines( t_col_data ).
+
+    "Create a structure definition.
+    try.
+
+        call method cl_abap_structdescr=&gt;create
+          exporting
+            p_components = lt_component
+          receiving
+            p_result     = lr_structdescr.
+
+      catch cx_sy_struct_creation .
+    endtry.
+
+    "Create a table definition.
+    try.
+
+        lr_tabledescr ?= cl_abap_tabledescr=&gt;create( p_line_type = lr_structdescr ).
+
+      catch cx_sy_table_creation.
+    endtry.
+
+    "Create a structure data object based on the structure definition.
+    create data r_wa_data  type handle lr_structdescr.
+
+    "Create a table data object based on the structure definition.
+    create data r_t_data type handle lr_tabledescr."like table of &lt;lwa_data&gt;.
+
+  endmethod.                    "create_table
+
+  method fill_table.
+
+    data:
+      lwa_cell_data                type rrws_s_cell,
+      lwa_axis_info                type rrws_sx_axis_info,
+<font color ="#0000FF">*      t_axis_chars                 type rrws_thx_axis_chars,</font>
+      lwa_axis_chars               type rrws_sx_axis_chars,
+      lv_cmpnm type rollname.
+
+    data:
+      lwa_axis_data                type rrws_sx_axis_data,
+      lwa_col_data                 type rrws_sx_tuple,
+      lv_count type i,
+      lv_index type i.",
+<font color ="#0000FF">*      t_col_data                   type rrws_tx_set,</font>
+<font color ="#0000FF">*      t_row_data                   type rrws_tx_set.</font>
+
+
+
+    field-symbols:
+      &lt;lv_data&gt;                        type any,
+      &lt;lwa_data&gt;                       type any,
+      &lt;lt_data&gt;                        type standard table.
+
+    data:
+      lv_col_count                   type i,
+      lv_col_num                     type i,
+      lv_tuple_ordinal               type i.
+
+    field-symbols:
+      &lt;lv_cmpnt&gt;                     type any.
+
+    assign r_wa_data-&gt;* to &lt;lwa_data&gt;.
+
+    assign r_t_data-&gt;* to &lt;lt_data&gt;.
+
+    "Loop through the key figure values and transpose.
+    loop at t_cell_data into lwa_cell_data.
+
+      "Get the modulous, i.e. for 3 columns, the modulous will be 1,2,0,1,2,0, etc.
+      lv_col_num = sy-tabix mod v_col_count.
+
+      "Translate the modulous i.e. for 3 columns, modulous 0 will be column 3.
+      if lv_col_num = 0.
+        lv_col_num = v_col_count.
+      endif.
+
+      "The Tuple Ordinal is base zero i.e. 1,2,3 becomes 0,1,2.
+      lv_tuple_ordinal = lv_col_num - 1.
+
+      "Dervie the component name for the key figure value.
+      lv_cmpnm = |KYF_{ lv_tuple_ordinal width = 6 align = right pad = '0' }|.
+
+      "Assign the component.
+      assign component lv_cmpnm of structure &lt;lwa_data&gt; to &lt;lv_data&gt;.
+      if sy-subrc = 0.
+
+        "Transfer the key figure value.
+        &lt;lv_data&gt; = lwa_cell_data-formatted_value.
+
+      endif.
+
+      if lv_col_num = v_col_count.
+
+        append &lt;lwa_data&gt; to &lt;lt_data&gt;.
+
+      endif.
+
+    endloop.
+
+  endmethod.                    "fill_table
+
+  method show_table.
+
+    data:
+      lr_table                       type ref to cl_salv_table,
+      lr_columns                     type ref to cl_salv_columns_table,
+      lr_column                      type ref to cl_salv_column,
+      lv_columnname                  type lvc_fname,
+      lr_functions                   type ref to cl_salv_functions,
+      lt_column_ref                  type salv_t_column_ref,
+      lwa_column_ref                 type salv_s_column_ref,
+      lv_text_s                      type scrtext_s,
+      lv_text_m                      type scrtext_m,
+      lv_text_l                      type scrtext_l.
+
+    field-symbols:
+      &lt;lt_data&gt;                        type standard table.
+
+    assign r_t_data-&gt;* to &lt;lt_data&gt;.
+
+    try.
+
+        cl_salv_table=&gt;factory( importing r_salv_table = lr_table changing t_table = &lt;lt_data&gt; ).
+
+      catch cx_salv_msg.
+    endtry.
+
+    try.
+
+        lr_columns = lr_table-&gt;get_columns( ).
+        lr_columns-&gt;set_optimize( rs_c_true ).
+
+        lt_column_ref = lr_columns-&gt;get( ).
+
+        loop at lt_column_ref into lwa_column_ref.
+
+          lr_column = lr_columns-&gt;get_column( lwa_column_ref-columnname ).
+
+          if lwa_column_ref-columnname(4) = 'KYF_'.
+
+            lv_text_l = lwa_column_ref-columnname+4.
+            lr_column-&gt;set_short_text( '' ).
+            lr_column-&gt;set_medium_text( '' ).
+            lr_column-&gt;set_long_text( lv_text_l ).
+
+          endif.
+
+          if lwa_column_ref-columnname(4) = 'CHA_'.
+
+            lv_text_l = lwa_column_ref-columnname+4.
+            lr_column-&gt;set_short_text( '' ).
+            lr_column-&gt;set_medium_text( '' ).
+            lr_column-&gt;set_long_text( lv_text_l ).
+
+          endif.
+
+        endloop.
+
+      catch cx_salv_not_found.
+    endtry.
+
+    lr_functions = lr_table-&gt;get_functions( ).
+    lr_functions-&gt;set_all( abap_true ).
+
+    lr_table-&gt;display( ).
+
+  endmethod.                    "show_table
+
+endclass.                    "lcl IMPLEMENTATION
+
+load-of-program.
+
+  selection-screen begin of block b1 with frame title _title_1.
+  parameters p_compid type rszcompid.
+  selection-screen end of block b1.
+
+initialization.
+
+  _title_1 = 'Selection'.
+
+  %_p_compid_%_app_%-text = 'BEx query technical name'.
+
+at selection-screen on p_compid.
+
+  "Check the technical name for the query is valid.
+  select single compid
+    into p_compid
+    from rszcompdir
+    where
+      compid = p_compid and
+      objvers = 'A'.
+  if sy-subrc &lt;&gt; 0.
+
+    message 'A valid BEx query technical name must be supplied.' type 'E'.
+
+  endif.
+
+start-of-selection.
+
+  data:
+    lr_lcl                         type ref to lcl,
+    lwa_param                      type lcl=&gt;ty_wa_param.
+
+  "Transfer selection-screen parameters to a work area.
+  lwa_param-p_compid = p_compid.
+
+  "Create instance of class.
+  call method lcl=&gt;factory
+    exporting
+      iwa_param = lwa_param
+    importing
+      er_lcl    = lr_lcl.
+
+  "Execute class.
+  lr_lcl-&gt;execute( ).
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* S_BRLID         Business Rule</font>
+<font color ="#0000FF">* S_COMPID         Query Tech. Name</font>
+<font color ="#0000FF">* S_IAREA         InfoArea</font>
+
+
+<font color ="#0000FF">*Messages</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">* Message class: Hard coded</font>
+<font color ="#0000FF">*   A valid BEx query technical name must be supplied.</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>

@@ -1,0 +1,464 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<html>
+<head>
+<title>Z_104087_COPY_USER_SET_ROLES</title>
+</head>
+<body bgcolor="#FFFFE0">
+<font size="3" face = "Arial" color="#000000"><b>Code listing for: Z_104087_COPY_USER_SET_ROLES</b></font>
+<br>
+<font size="3" face = "Arial" color="#000000"><b>Description:  Copy user and set role assignments</b></font>
+<hr>
+<pre width="100">
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*& Report  Z_104087_COPY_USER_SET_ROLES</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&</font>
+<font color ="#0000FF">*&---------------------------------------------------------------------*</font>
+
+report z_104087_copy_user_set_roles.
+
+parameters:
+  p_delusr                         type rs_bool default '',
+  p_getdta                         type rs_bool default 'X',
+  p_export                         type rs_bool default 'X',
+  p_import                         type rs_bool default ''.
+
+start-of-selection.
+
+  types:
+    begin of ty_wa_auth_usrt,
+      uname	                       type xubname,
+      lastname                     type ad_namelas,
+    end of   ty_wa_auth_usrt.
+
+  types:
+    begin of ty_wa_auth_usr_xrl,
+      uname	                       type xubname,
+      xrlid	                       type agr_name,
+    end of   ty_wa_auth_usr_xrl.
+
+  types:
+    begin of ty_wa_xrlid,
+      xrlid                          type agr_name,
+    end of ty_wa_xrlid,
+    ty_t_xrlid                       type table of ty_wa_xrlid with non-unique key table_line,
+    begin of ty_wa_x_usr_xrl,
+      uname                          type xubname,
+      t_xrlid                        type ty_t_xrlid,
+    end  of ty_wa_x_usr_xrl,
+    ty_th_x_usr_xrl                  type hashed table of ty_wa_x_usr_xrl with unique key uname.
+
+  data:
+    lv_delusr                      type rs_bool,
+    lv_getdta                      type rs_bool,
+    lv_export                      type rs_bool,
+    lv_import                      type rs_bool.
+
+  field-symbols:
+    &lt;lv_param&gt;                     type any.
+
+  data:
+    lwa_usrt                       type ty_wa_auth_usrt,
+    lt_usrt                        type table of ty_wa_auth_usrt,
+    lth_usrt                       type hashed table of ty_wa_auth_usrt with unique key uname,
+    lv_xrlid                       type z_auth_xrlid,
+    lwa_usr_xrl                    type ty_wa_auth_usr_xrl,
+    lt_usr_xrl                     type table of ty_wa_auth_usr_xrl,
+    lwa_x_usr_xrl                  type ty_wa_x_usr_xrl,
+    lth_x_usr_xrl                  type ty_th_x_usr_xrl.
+
+  field-symbols:
+    &lt;lwa_x_usr_xrl&gt;                type ty_wa_x_usr_xrl.
+
+  data:
+    lv_filename                    type string,
+    lv_filedata                    type string,
+    lt_filedata                    type stringtab.
+
+  data:
+    lv_username                    type bapibname-bapibname,
+    lwa_logondata                  type bapilogond,
+    lwa_password                   type bapipwd,
+    lwa_defaults                   type bapidefaul,
+    lwa_address                    type bapiaddr3.
+
+  data:
+    lwa_activitygroups             type bapiagr,
+    lt_activitygroups              type table of bapiagr,
+    lt_activitygroups_tmpl         type table of bapiagr,
+    lwa_return                     type bapiret2,
+    lt_return                      type table of bapiret2.
+
+  data:
+    lv_timestamp_from	             type timestampl,
+    lv_timestamp_to  	             type timestampl,
+    lv_drtn_secs                   type tzntstmpl,
+    lv_milliseconds                type i.
+
+  data:
+    lv_mtext                       type string.
+
+  assign ('P_DELUSR') to &lt;lv_param&gt;.
+  if sy-subrc = 0.
+    lv_delusr = &lt;lv_param&gt;.
+  else.
+    lv_delusr = ''.
+  endif.
+
+  assign ('P_GETDTA') to &lt;lv_param&gt;.
+  if sy-subrc = 0.
+    lv_getdta = &lt;lv_param&gt;.
+  else.
+    lv_getdta = ''.
+  endif.
+
+  assign ('P_EXPORT') to &lt;lv_param&gt;.
+  if sy-subrc = 0.
+    lv_export = &lt;lv_param&gt;.
+  else.
+    lv_export = ''.
+  endif.
+
+  assign ('P_IMPORT') to &lt;lv_param&gt;.
+  if sy-subrc = 0.
+    lv_import = &lt;lv_param&gt;.
+  else.
+    lv_import = 'X'.
+  endif.
+
+  "Get timestamp.
+  get time stamp field lv_timestamp_from.
+
+  if lt_usr_xrl is initial.
+
+    if lv_getdta = rs_c_true.
+
+      "Retrieve assignments by username.
+      select
+          uname
+          xrlid
+        into corresponding fields of table lt_usr_xrl ##TOO_MANY_ITAB_FIELDS
+        from ('ZZX_AUTH_USR_XRL').
+
+    endif.
+
+    "Set filename.
+    lv_filename = '/usr/sap/trans/Temp/DEV/DRA/ZZX_AUTH_USR_XRL.txt'.
+
+    if lv_export = rs_c_true.
+
+      "Convert to string.
+      lv_filedata = concat_lines_of( table = lt_usr_xrl sep = ';' ).
+
+      "Open file for write.
+      open dataset lv_filename for output in text mode encoding default.
+      if sy-subrc &lt;&gt; 0.
+        return.
+      endif.
+
+      "Transfer data to file.
+      transfer lv_filedata to lv_filename.
+
+      "Close file.
+      close dataset lv_filename.
+
+    endif.
+
+    if lv_import = rs_c_true.
+
+      "Open file for read.
+      open dataset lv_filename for input in text mode encoding default.
+      if sy-subrc &lt;&gt; 0.
+        return.
+      endif.
+
+      "Transfer data to file.
+      read dataset lv_filename into lv_filedata.
+
+      "Close file.
+      close dataset lv_filename.
+
+      "Convert to table of strings.
+      split lv_filedata at ';' into table lt_filedata.
+
+      loop at lt_filedata into lv_filedata.
+
+        lwa_usr_xrl-uname = lv_filedata(12).
+        lwa_usr_xrl-xrlid = lv_filedata+12.
+        append lwa_usr_xrl to lt_usr_xrl.
+
+      endloop.
+
+    endif.
+
+  endif.
+
+  if lth_usrt is initial.
+
+    if lv_getdta = rs_c_true.
+
+      "Retrieve lastname for username.
+      select
+          uname
+          lastname
+        into corresponding fields of table lth_usrt ##TOO_MANY_ITAB_FIELDS
+        from ('ZZX_AUTH_USRT')
+        where ('SPRAS = SY-LANGU').
+
+    endif.
+
+    "Set filename.
+    lv_filename = '/usr/sap/trans/Temp/DEV/DRA/ZZX_AUTH_USRT.txt'.
+
+    if lv_export = rs_c_true.
+
+      "Convert hash table to standard table.
+      lt_usrt = lth_usrt.
+
+      "Convert to string.
+      lv_filedata = concat_lines_of( table = lt_usrt sep = ';' ).
+
+      "Open file for write.
+      open dataset lv_filename for output in text mode encoding default.
+      if sy-subrc &lt;&gt; 0.
+        return.
+      endif.
+
+      "Transfer data to file.
+      transfer lv_filedata to lv_filename.
+
+      "Close file.
+      close dataset lv_filename.
+
+    endif.
+
+    if lv_import = rs_c_true.
+
+      "Open file for read.
+      open dataset lv_filename for input in text mode encoding default.
+      if sy-subrc &lt;&gt; 0.
+        return.
+      endif.
+
+      "Transfer data to file.
+      read dataset lv_filename into lv_filedata.
+
+      "Close file.
+      close dataset lv_filename.
+
+      "Convert to table of strings.
+      split lv_filedata at ';' into table lt_filedata.
+
+      loop at lt_filedata into lv_filedata.
+
+        lwa_usrt-uname = lv_filedata(12).
+        lwa_usrt-lastname = lv_filedata+12.
+        insert lwa_usrt into table lth_usrt.
+
+      endloop.
+
+    endif.
+
+  endif.
+
+  "Catalogue assignments by username.
+  loop at lt_usr_xrl into lwa_usr_xrl.
+
+    read table lth_x_usr_xrl assigning &lt;lwa_x_usr_xrl&gt;
+      with table key
+        uname = lwa_usr_xrl-uname.
+    if sy-subrc &lt;&gt; 0.
+
+      lwa_x_usr_xrl-uname = lwa_usr_xrl-uname.
+      insert lwa_x_usr_xrl into table lth_x_usr_xrl assigning &lt;lwa_x_usr_xrl&gt;.
+
+    endif.
+
+    "Associate the SAP Technical Role with the username.
+    append lwa_usr_xrl-xrlid to &lt;lwa_x_usr_xrl&gt;-t_xrlid.
+
+  endloop.
+
+  "Sort and remove duplicates.
+  loop at lth_x_usr_xrl assigning &lt;lwa_x_usr_xrl&gt;.
+
+    sort &lt;lwa_x_usr_xrl&gt;-t_xrlid.
+    delete adjacent duplicates from &lt;lwa_x_usr_xrl&gt;-t_xrlid.
+
+  endloop.
+
+  "Get timestamp.
+  get time stamp field lv_timestamp_to.
+
+  "Calculate duration.
+  lv_milliseconds = abs( cl_abap_tstmp=&gt;subtract( tstmp1 = lv_timestamp_to tstmp2 = lv_timestamp_from ) * 1000 ).
+
+  lv_mtext = |Meta-data retrieved in { lv_milliseconds } milliseconds.|.
+  write: / lv_mtext.
+
+  "Get timestamp.
+  get time stamp field lv_timestamp_from.
+
+  if lth_x_usr_xrl is not initial.
+
+    "Get details of template user.
+    call function 'BAPI_USER_GET_DETAIL'
+      exporting
+        username       = 'HRR9999'
+      importing
+        logondata      = lwa_logondata
+        defaults       = lwa_defaults
+        address        = lwa_address
+      tables
+        activitygroups = lt_activitygroups_tmpl
+        return         = lt_return.
+
+    "Process each employee.
+    loop at lth_x_usr_xrl assigning &lt;lwa_x_usr_xrl&gt;.
+
+      "Utility restricted to HR Rebuild users.
+      check &lt;lwa_x_usr_xrl&gt;-uname cp 'HRR*'.
+
+      "Utility should not adjust BOBJ replication user.
+      check &lt;lwa_x_usr_xrl&gt;-uname &lt;&gt; 'HRR0000' .
+
+      "Utility should not adjust template user.
+      check &lt;lwa_x_usr_xrl&gt;-uname &lt;&gt; 'HRR9999'.
+
+      "Clear variables.
+      clear:
+         lv_username,
+         lwa_password,
+         lwa_address.
+
+      "Set username.
+      lv_username = &lt;lwa_x_usr_xrl&gt;-uname.
+
+      if lv_delusr = rs_c_true.
+
+        "Set initial password.
+        lwa_password-bapipwd = 'Bonjour1*'.
+
+        "Set firstname.
+        lwa_address-firstname = 'HR Rebuild:'.
+
+        "Read lastname.
+        read table lth_usrt into lwa_usrt
+          with table key
+            uname = &lt;lwa_x_usr_xrl&gt;-uname.
+        if sy-subrc = 0.
+
+          "Set lastname.
+          lwa_address-lastname  = lwa_usrt-lastname.
+
+        endif.
+
+        "Delete the user.
+        call function 'BAPI_USER_DELETE'
+          exporting
+            username = lv_username
+          tables
+            return   = lt_return.
+
+        "Create the user.
+        call function 'BAPI_USER_CREATE1'
+          exporting
+            username  = lv_username
+            logondata = lwa_logondata
+            password  = lwa_password
+            defaults  = lwa_defaults
+            address   = lwa_address.
+
+      endif.
+
+      "Copy the assignments from the template user.
+      lt_activitygroups = lt_activitygroups_tmpl.
+
+      "Add role assignments to table.
+      loop at &lt;lwa_x_usr_xrl&gt;-t_xrlid into lv_xrlid.
+
+        clear lwa_activitygroups.
+        lwa_activitygroups-agr_name = lv_xrlid.
+        lwa_activitygroups-from_dat = sy-datum.
+        lwa_activitygroups-to_dat   = '99991231'.
+        append lwa_activitygroups to lt_activitygroups.
+
+      endloop.
+
+      "Assign roles.
+      call function 'BAPI_USER_ACTGROUPS_ASSIGN'
+        exporting
+          username       = lv_username
+        tables
+          activitygroups = lt_activitygroups
+          return         = lt_return.
+      if lt_return is not initial.
+
+        loop at lt_return into lwa_return.
+
+          if lwa_return-type &lt;&gt; 'S'.
+
+            message id lwa_return-id type lwa_return-type number lwa_return-number
+              with
+                lwa_return-message_v1
+                lwa_return-message_v2
+                lwa_return-message_v3
+                lwa_return-message_v4
+              into lv_mtext.
+
+            write: / lv_mtext.
+
+          endif.
+
+        endloop.
+
+      endif.
+
+    endloop.
+
+  endif.
+
+  "Get timestamp.
+  get time stamp field lv_timestamp_to.
+
+  try.
+
+      "Calculate the execution time.
+      call method cl_abap_tstmp=&gt;subtract
+        exporting
+          tstmp1 = lv_timestamp_to
+          tstmp2 = lv_timestamp_from
+        receiving
+          r_secs = lv_drtn_secs.
+
+    catch cx_parameter_invalid_range .
+    catch cx_parameter_invalid_type .
+  endtry.
+
+  lv_milliseconds = abs( lv_drtn_secs ) * 1000.
+
+  lv_mtext = |{ lines( lth_x_usr_xrl ) } users updated in { lv_milliseconds } milliseconds.|.
+  write: / lv_mtext.
+
+
+<font color ="#0000FF">*Selection texts</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">* P_DELUSR         Delete and Re-create user</font>
+<font color ="#0000FF">* P_EXPORT         Export meta-data</font>
+<font color ="#0000FF">* P_GETDTA         Retrieve meta-data</font>
+<font color ="#0000FF">* P_IMPORT         Import meta-data</font>
+
+
+<font color ="#0000FF">*Messages</font>
+<font color ="#0000FF">*----------------------------------------------------------</font>
+<font color ="#0000FF">*</font>
+<font color ="#0000FF">* Message class: LWA_RETURN-ID</font>
+<font color ="#0000FF">*LWA</font>
+</pre>
+<hr>
+<font size="2" face = "Sans Serif">Extracted by Direct Download Enterprise version 1.3.1 - E.G.Mellodew. 1998-2005 UK. Sap Release 731
+</font>
+</body>
+</html>
